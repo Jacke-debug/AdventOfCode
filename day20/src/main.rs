@@ -1,4 +1,4 @@
-use std::{collections::HashMap};
+use std::{collections::HashMap, time::Instant};
 
 fn parse_image(image: HashMap<(i32, i32), char>, decoder: &HashMap<isize, char>) -> HashMap<(i32, i32), char>{
     let mut new_map = HashMap::new();
@@ -44,6 +44,7 @@ fn size(image: & HashMap<(i32, i32), char>) -> (i32, i32, i32, i32) {
 }
 
 fn main() {
+    let now = Instant::now();
     let input = include_str!("input.txt");
 
     let mut image = HashMap::new();
@@ -107,9 +108,12 @@ fn main() {
             }
             vec.push(*image.get(&(x,y)).unwrap());
         } 
-        println!("{:?}", vec)
+        //println!("{:?}", vec)
     }
     println!("{}", count);
     // Part A: 5622
     // part B: 20395
+
+    let then = Instant::now();
+    println!("{:?}", then-now)
 }

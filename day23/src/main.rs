@@ -93,7 +93,7 @@ fn can_pod_move(pod: & Pod, state: & Vec<Pod>) -> Vec<Motion> {
         
         let pods_in_room = state.iter().filter(|p| p.x_pos == desired_x_pos && p.done).count();
         if free_to_move(*pod, desired_x_pos, state) {
-            let motion = Motion { pod_id: pod.id, finishing: true, x_pos: desired_x_pos, depth: (pods_in_room as i32) -2 };
+            let motion = Motion { pod_id: pod.id, finishing: true, x_pos: desired_x_pos, depth: (pods_in_room as i32) -4 };
             possible_motions.push(motion); 
             return possible_motions
         }
@@ -123,37 +123,47 @@ fn is_final_state(state: & Vec<Pod>) -> bool {
     true
 }
 
+fn make_move(mv: Motion, state: & Vec<Pod>, cost: i32, lowest_cost: &mut i32) {
+    let mut new_state = state.clone();
+    let mut pod = new_state.iter_mut()
+        .filter(|p| p.id == mv.pod_id).next().unwrap();
+    
+    let mut this_cost = cost;
+    let dy = (pod.depth - mv.depth).abs();
+    let dx = (pod.x_pos - mv.x_pos).abs();
+    
+    this_cost += 10_i32.pow(pod.art as u32) * (dx + dy);
+    if this_cost > *lowest_cost {
+        return
+    }
+    // println!("moving: {}, x_pos: {}, depth: {}", id, mv.x_pos, mv.depth);
+    pod.x_pos = mv.x_pos;
+    pod.depth = mv.depth;
+    pod.done = pos_is_final(pod, &state);
+    //println!("Checking if fone \n {:#?}", new_state);
+    if is_final_state(&new_state) {
+        *lowest_cost = *lowest_cost.min(&mut this_cost);
+    } else {
+        check_possible_moves(& new_state, this_cost, lowest_cost);
+    }
+}
+
 fn check_possible_moves(state: & Vec<Pod>, cost: i32, lowest_cost: &mut i32){
     let mut moves = Vec::new();
     
     for pod in state.iter().filter(|p| !p.done) {
-        moves = can_pod_move(pod, &state);
-        
-        let id = pod.id;
+        let moves_ = can_pod_move(pod, &state);
+        for movv in moves_ {
+            moves.push(movv);
+        }
+    }
+
+    if let Some(finishing_move) = moves.iter().filter(|p| p.finishing).next() {
+        make_move(*finishing_move, state, cost, lowest_cost);
+    } else {
         // println!("id: {}, {:?}", id, moves);
         for mv in moves.iter() {
-            let mut new_state = state.clone();
-            let mut this_cost = cost;
-            let dy = (pod.depth - mv.depth).abs();
-            let dx = (pod.x_pos - mv.x_pos).abs();
-            
-            this_cost += 10_i32.pow(pod.art as u32) * (dx + dy);
-            if this_cost > *lowest_cost {
-                continue
-            }
-            // println!("moving: {}, x_pos: {}, depth: {}", id, mv.x_pos, mv.depth);
-
-            let mut pod_m = new_state.iter_mut()
-            .filter(|p| p.id == id).next().unwrap();
-            pod_m.x_pos = mv.x_pos;
-            pod_m.depth = mv.depth;
-            pod_m.done = pos_is_final(pod_m, &state);
-            //println!("Checking if fone \n {:#?}", new_state);
-            if is_final_state(&new_state) {
-                *lowest_cost = *lowest_cost.min(&mut this_cost);
-            } else {
-                check_possible_moves(& new_state, this_cost, lowest_cost);
-            }
+            make_move(*mv, state, cost, lowest_cost);
         }
     }
 }
@@ -162,7 +172,7 @@ fn main() {
     // BCBD 
     // ADCA
     let mut state = Vec::new();
-    let input = include_str!("example.txt");
+    let input = include_str!("partb.txt");
     let mut id = 0;
     for (y, line) in input.trim().split("\r\n").enumerate() {
         for (x, c) in line.trim().chars().enumerate() {
@@ -188,6 +198,8 @@ fn main() {
     // println!("{:?}", cost_vec);
     println!("{:?}", lowest_cost);
     // 14350 too low
+
+    // with depth 4: 16763
 
     let end = Instant::now();
     println!("{:?}", end-start);

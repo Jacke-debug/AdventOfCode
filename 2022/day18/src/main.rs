@@ -1,27 +1,31 @@
-use std::collections::HashSet;
-
 
 fn part_a(input: &str) -> i32 {
     let mut score = 0;
-    let mut crystals: HashSet<(i32, i32, i32)> = HashSet::new();
+    let mut crystals: Vec<(i32, i32, i32)> = Vec::new();
 
-    for line in input.split("\r\n") {
+    for line in input.split("\n") {
         let mut iter = line.split(",");
         let position: (i32, i32, i32) = (
             iter.next().and_then(|s| s.parse().ok()).unwrap(),
             iter.next().and_then(|s| s.parse().ok()).unwrap(),
             iter.next().and_then(|s| s.parse().ok()).unwrap()
         );
-        crystals.insert(position);
+        crystals.push(position);
     }
 
-    for (x, y, z) in crystals.iter() {
+    score = get_surfaces(&crystals);
+
+    return score;
+}
+
+fn get_surfaces(crystal: &Vec<(i32, i32, i32)>) -> i32 {
+    let mut score = 0;
+    for (x, y, z) in crystal.iter() {
         for direction in [1, -1] {
             for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
                 let neighbour = (x+dx*direction, y+dy*direction, z+dz*direction);
-                match crystals.get(&neighbour) {
-                    Some(_) => {},
-                    None => {score += 1;},
+                if !crystal.contains(&neighbour) {
+                    score += 1;
                 }
             }
         }
@@ -29,43 +33,34 @@ fn part_a(input: &str) -> i32 {
     return score;
 }
 
-fn check_neighbour(cystal: &HashSet<(i32, i32, i32)>, checked: &mut HashSet<(i32, i32, i32)>, pos: (i32, i32, i32)) -> bool {
-    let size = cystal.iter().map(|(x, y, z)| x.max(y.max(z))).max().unwrap();
-
-    let (x, y, z) = pos;
-
-    for dir in [1, -1] {
-        'dirs: for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
-            let neighbour = (x+dx*dir, y+dy*dir, z+dz*dir);
-            if neighbour.0 == *size || neighbour.0 == 0 ||neighbour.1 == *size || neighbour.1 == 0 || neighbour.2 == *size || neighbour.2 == 0 {
-                return false;
+#[inline(always)]
+fn add_outer_volume(map: &mut Vec<(i32, i32, i32)>, pos: (i32, i32, i32)) {
+    map.push(pos);
+    for direction in [1, -1] {
+        for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
+            let (x, y, z) = (pos.0+dx*direction, pos.1+dy*direction, pos.2+dz*direction);
+            if x < 1 || y < 1 || z < 1 || x >= 5 || y >= 5 || z >= 8 {
+                continue;
             }
-            if let Some(_) = checked.get(&neighbour) {
-                continue 'dirs;
+            if !map.contains(&(x, y, z)) {
+                add_outer_volume(map, (x, y, z)); 
             }
-            match cystal.get(&neighbour) {
-                Some(_) => {
-                    // no empty space on this side. 
-                    continue 'dirs;
-                },
-                None => {
-                    // empty space, check if
-                    checked.insert(neighbour);
-                    return check_neighbour(cystal, checked, neighbour);
-                },
-            }
-        }        
+        }
     }
-    return true;
+
 }
 
 fn part_b(input: &str) -> i32 {
     let mut score = 0;
-    let mut crystals: HashSet<(i32, i32, i32)> = HashSet::new();
+    let mut crystals: Vec<(i32, i32, i32)> = Vec::new();
 
-    let mut x_min = 0;
-    let mut x_max = 0;
-    for line in input.split("\r\n") {
+    let mut x_min = i32::MAX;
+    let mut x_max = i32::MIN;
+    let mut y_min = i32::MAX;
+    let mut y_max = i32::MIN;
+    let mut z_min = i32::MAX;
+    let mut z_max = i32::MIN;
+    for line in input.split("\n") {
         let mut iter = line.split(",");
         let position: (i32, i32, i32) = (
             iter.next().and_then(|s| s.parse().ok()).unwrap(),
@@ -74,54 +69,32 @@ fn part_b(input: &str) -> i32 {
         );
         x_max = x_max.max(position.0);
         x_min = x_min.min(position.0);
-        crystals.insert(position);
+        y_max = y_max.max(position.1);
+        y_min = y_min.min(position.1);
+        z_max = z_max.max(position.2);
+        z_min = z_min.min(position.2);
+        crystals.push(position);
     }
+    x_max = x_max+2;
+    y_max = y_max+2;
+    z_max = z_max+2;
+    let x_size = x_max-x_min;
+    let y_size = y_max-y_min;
+    let z_size = z_max-z_min;
+    println!("{:?}", (x_min, x_max, y_min, y_max, z_min, z_max));
+    let outer = x_size*y_size*2 + x_size*z_size*2 + y_size*z_size*2;
+    println!("{}", outer);
 
+    crystals = crystals.iter().map(|(x, y, z)| (x+1, y+1, z+1)).collect();
     
-    let mut interla_points: Vec<(i32, i32, i32)> = Vec::new();
-    for (x, y, z) in crystals.iter() {
-        for direction in [1, -1] {
-            for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
-                let neighbour = (x+dx*direction, y+dy*direction, z+dz*direction);
-                let mut checked: HashSet<(i32, i32, i32)> = HashSet::new();
-                match crystals.get(&neighbour) {
-                    Some(_) => {
-                        
-                    },
-                    None => {
-                        if check_neighbour(&crystals, &mut checked, neighbour) {
-                            interla_points.push((neighbour));
-                        }                     
-                    },
-                }
-                
-            }
-        }
-    }
-    for point in interla_points {
-        println!("Internal {:?}", point);
-        crystals.insert(point);
-    }
+    let original_score = get_surfaces(&crystals);
 
-    // fill voids?
-    let mut checked: HashSet<(i32, i32, i32)> = HashSet::new();
-    for (x, y, z) in crystals.iter() {
-        for direction in [1, -1] {
-            for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
-                let neighbour = (x+dx*direction, y+dy*direction, z+dz*direction);
-                match crystals.get(&neighbour) {
-                    Some(_) => {
-                        
-                    },
-                    None => {
-                        // check if point is internal?
-                        score += 1;                        
-                    },
-                }
-            }
-        }
-    }
+    let pos = (x_min, y_min, z_min);
+    add_outer_volume(&mut crystals, pos);
+   
+    score = original_score - (get_surfaces(&crystals) - outer); 
     // 2463 low
+    // high 2992
     return score;
 }
 

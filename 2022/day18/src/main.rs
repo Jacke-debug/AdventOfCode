@@ -1,68 +1,20 @@
+use std::collections::btree_map::Values;
 
-fn part_a(input: &str) -> i32 {
+
+fn part_a(input: &str) -> usize {
     let mut score = 0;
-    let mut crystals: Vec<(i32, i32, i32)> = Vec::new();
 
-    for line in input.split("\n") {
+    let mut x_min = usize::MAX;
+    let mut x_max = usize::MIN;
+    let mut y_min = usize::MAX;
+    let mut y_max = usize::MIN;
+    let mut z_min = usize::MAX;
+    let mut z_max = usize::MIN;
+
+    let mut crystal: Vec<(usize, usize, usize)> = Vec::new();
+    for line in input.split("\r\n") {
         let mut iter = line.split(",");
-        let position: (i32, i32, i32) = (
-            iter.next().and_then(|s| s.parse().ok()).unwrap(),
-            iter.next().and_then(|s| s.parse().ok()).unwrap(),
-            iter.next().and_then(|s| s.parse().ok()).unwrap()
-        );
-        crystals.push(position);
-    }
-
-    score = get_surfaces(&crystals);
-
-    return score;
-}
-
-fn get_surfaces(crystal: &Vec<(i32, i32, i32)>) -> i32 {
-    let mut score = 0;
-    for (x, y, z) in crystal.iter() {
-        for direction in [1, -1] {
-            for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
-                let neighbour = (x+dx*direction, y+dy*direction, z+dz*direction);
-                if !crystal.contains(&neighbour) {
-                    score += 1;
-                }
-            }
-        }
-    }
-    return score;
-}
-
-#[inline(always)]
-fn add_outer_volume(map: &mut Vec<(i32, i32, i32)>, pos: (i32, i32, i32)) {
-    map.push(pos);
-    for direction in [1, -1] {
-        for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
-            let (x, y, z) = (pos.0+dx*direction, pos.1+dy*direction, pos.2+dz*direction);
-            if x < 1 || y < 1 || z < 1 || x >= 5 || y >= 5 || z >= 8 {
-                continue;
-            }
-            if !map.contains(&(x, y, z)) {
-                add_outer_volume(map, (x, y, z)); 
-            }
-        }
-    }
-
-}
-
-fn part_b(input: &str) -> i32 {
-    let mut score = 0;
-    let mut crystals: Vec<(i32, i32, i32)> = Vec::new();
-
-    let mut x_min = i32::MAX;
-    let mut x_max = i32::MIN;
-    let mut y_min = i32::MAX;
-    let mut y_max = i32::MIN;
-    let mut z_min = i32::MAX;
-    let mut z_max = i32::MIN;
-    for line in input.split("\n") {
-        let mut iter = line.split(",");
-        let position: (i32, i32, i32) = (
+        let position: (usize, usize, usize) = (
             iter.next().and_then(|s| s.parse().ok()).unwrap(),
             iter.next().and_then(|s| s.parse().ok()).unwrap(),
             iter.next().and_then(|s| s.parse().ok()).unwrap()
@@ -73,26 +25,124 @@ fn part_b(input: &str) -> i32 {
         y_min = y_min.min(position.1);
         z_max = z_max.max(position.2);
         z_min = z_min.min(position.2);
-        crystals.push(position);
+        crystal.push(position);
     }
+    x_max = x_max+1;
+    y_max = y_max+1;
+    z_max = z_max+1;
+
+    let mut map: Vec<Vec<Vec<bool>>> = vec![vec![vec![false; z_max]; y_max]; x_max];
+    for (x, y, z) in crystal.into_iter() {
+        map[x][y][z] = true;
+    }
+
+    score = get_surfaces(&map, (x_max, y_max, z_max));
+
+    return score;
+}
+
+fn get_surfaces(crystal: &Vec<Vec<Vec<bool>>>, size: (usize, usize, usize)) -> usize {
+    let(x_max, y_max, z_max) = size;
+    let mut score = 0;
+    for (x, subyz) in crystal.into_iter().enumerate() {
+        for (y, subz) in subyz.into_iter().enumerate() {
+            for (z, val) in subz.into_iter().enumerate() {
+                if *val {
+                    for direction in [1, -1] {
+                        let (x0, y0 ,z0) = (x as i32, y as i32, z as i32);
+                        for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
+                            let (pos_x, pos_y, pos_z) = (x0+dx*direction, y0+dy*direction, z0+dz*direction);
+                            if pos_x < 0 || pos_y < 0 || pos_z < 0 || pos_x >= x_max as i32|| pos_y >= y_max as i32 || pos_z >= z_max as i32 {
+                                score += 1;
+                                continue;
+                            }
+                            
+                            let xu = pos_x as usize;
+                            let yu = pos_y as usize;
+                            let zu = pos_z as usize;
+
+                            if !crystal[xu][yu][zu] {
+                                score += 1;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+    return score;
+}
+
+fn add_outer_volume(map: &mut Vec<Vec<Vec<bool>>>, pos: &(usize, usize, usize), size: &(usize, usize, usize)) {
+    let(x_max, y_max, z_max) = size;
+    let (x0, y0, z0) = pos;
+    map[*x0][*y0][*z0] = true;
+    let (x0, y0, z0) = (*x0 as i32, *y0 as i32, *z0 as i32);
+    for direction in [1, -1] {
+        for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
+            let (x, y, z) = (x0+dx*direction, y0+dy*direction, z0+dz*direction);
+            
+            if x < 0 || y < 0 || z < 0 || x >= *x_max as i32|| y >= *y_max as i32 || z >= *z_max as i32 {
+                continue;
+            }
+            let (x, y, z) = (x as usize, y as usize, z as usize);
+            if !map[x][y][z] {
+                add_outer_volume(map, &(x, y, z), size); 
+            }
+        }
+    }
+
+}
+
+fn part_b(input: &str) -> i32 {
+    let mut score = 0;
+
+    let mut x_min = usize::MAX;
+    let mut x_max = usize::MIN;
+    let mut y_min = usize::MAX;
+    let mut y_max = usize::MIN;
+    let mut z_min = usize::MAX;
+    let mut z_max = usize::MIN;
+
+    let mut crystal: Vec<(usize, usize, usize)> = Vec::new();
+    
+    for line in input.split("\r\n") {
+        let mut iter = line.split(",");
+        let position: (usize, usize, usize) = (
+            iter.next().and_then(|s| s.parse().ok()).unwrap(),
+            iter.next().and_then(|s| s.parse().ok()).unwrap(),
+            iter.next().and_then(|s| s.parse().ok()).unwrap()
+        );
+        x_max = x_max.max(position.0);
+        x_min = x_min.min(position.0);
+        y_max = y_max.max(position.1);
+        y_min = y_min.min(position.1);
+        z_max = z_max.max(position.2);
+        z_min = z_min.min(position.2);
+        crystal.push(position);
+    }
+    // shift
+    crystal = crystal.iter().map(|(x, y, z)| (x+1, y+1, z+1)).collect();
+
     x_max = x_max+2;
     y_max = y_max+2;
     z_max = z_max+2;
-    let x_size = x_max-x_min;
-    let y_size = y_max-y_min;
-    let z_size = z_max-z_min;
-    println!("{:?}", (x_min, x_max, y_min, y_max, z_min, z_max));
-    let outer = x_size*y_size*2 + x_size*z_size*2 + y_size*z_size*2;
-    println!("{}", outer);
 
-    crystals = crystals.iter().map(|(x, y, z)| (x+1, y+1, z+1)).collect();
+    let mut map: Vec<Vec<Vec<bool>>> = vec![vec![vec![false; z_max]; y_max]; x_max];
+    for (x, y, z) in crystal.into_iter() {
+        map[x][y][z] = true;
+    }
+
+    let outer = x_max*y_max*2 + x_max*z_max*2 + y_max*z_max*2;
+    let outer = outer as i32;
     
-    let original_score = get_surfaces(&crystals);
+    let original_score = get_surfaces(&map, (x_max, y_max, z_max));
 
-    let pos = (x_min, y_min, z_min);
-    add_outer_volume(&mut crystals, pos);
-   
-    score = original_score - (get_surfaces(&crystals) - outer); 
+    let pos = (0, 0, 0);
+    add_outer_volume(&mut map, &pos, &(x_max, y_max, z_max));
+
+    let complemented_score = get_surfaces(&map, (x_max, y_max, z_max)) as i32;
+    score = original_score as i32 - (complemented_score - outer); 
     // 2463 low
     // high 2992
     return score;
@@ -100,9 +150,11 @@ fn part_b(input: &str) -> i32 {
 
 
 fn main() {
-    let input = include_str!("example.txt");
+    let input = include_str!("input.txt");
+    
     let score_a = part_a(input);
-    let score_b = part_b(input);
     println!("Score A: {}", score_a);
+
+    let score_b = part_b(input);
     println!("Score B: {}", score_b);
 }

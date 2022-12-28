@@ -1,4 +1,4 @@
-use std::collections::btree_map::Values;
+use std::collections::{btree_map::Values, VecDeque};
 
 
 fn part_a(input: &str) -> usize {
@@ -77,17 +77,23 @@ fn add_outer_volume(map: &mut Vec<Vec<Vec<bool>>>, pos: &(usize, usize, usize), 
     let(x_max, y_max, z_max) = size;
     let (x0, y0, z0) = pos;
     map[*x0][*y0][*z0] = true;
-    let (x0, y0, z0) = (*x0 as i32, *y0 as i32, *z0 as i32);
-    for direction in [1, -1] {
-        for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
-            let (x, y, z) = (x0+dx*direction, y0+dy*direction, z0+dz*direction);
-            
-            if x < 0 || y < 0 || z < 0 || x >= *x_max as i32|| y >= *y_max as i32 || z >= *z_max as i32 {
-                continue;
-            }
-            let (x, y, z) = (x as usize, y as usize, z as usize);
-            if !map[x][y][z] {
-                add_outer_volume(map, &(x, y, z), size); 
+    let mut queue = VecDeque::new();
+    queue.push_back((*x0, *y0, *z0));
+
+    while !queue.is_empty() {
+        let (x, y, z) = queue.pop_front().unwrap();
+        for direction in [1, -1] {
+            for (dx, dy, dz) in [(1, 0, 0), (0, 1, 0), (0, 0, 1)] {
+                let (x_new, y_new, z_new) = (x as i32 +dx*direction, y as i32 +dy*direction, z as i32 +dz*direction);
+                
+                if x_new < 0 || y_new < 0 || z_new < 0 || x_new >= *x_max as i32 || y_new >= *y_max as i32 || z_new >= *z_max as i32 {
+                    continue;
+                }
+                let (x_new, y_new, z_new) = (x_new as usize, y_new as usize, z_new as usize);
+                if !map[x_new][y_new][z_new] {
+                    map[x_new][y_new][z_new] = true;
+                    queue.push_back((x_new, y_new, z_new));
+                }
             }
         }
     }

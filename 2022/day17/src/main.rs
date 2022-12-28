@@ -1,46 +1,4 @@
-use std::collections::{HashSet};
-
-fn get_y_max(map: & HashSet<(i64, i64)>) -> i64 {
-    let mut y_max = 0;
-    for (_, y) in map.iter() {
-        y_max = y_max.max(*y);
-    }
-    return y_max;
-}
-
-
-fn print_2d_map(map: & HashSet<(i64, i64)>) {
-    println!();
-    let y_max = get_y_max(&map);
-    for y in 0..=y_max{
-        let y_pos = y_max-y;
-        for x in 0..7 {
-            match map.get(&(x, y_pos)) {
-                Some(_) => {
-                    print!("#");
-                },
-                None => {print!(".");},
-            }
-        }
-        println!();
-    }
-}
-
-fn print_rocks(rocks:  & Vec<Vec<(i64, i64)>>) {
-    for rock in rocks {
-        for y in 0..=3 {
-            for x in 0..=3 {
-                if rock.contains(&(x,y)) {
-                    print!("@");
-                } else {
-                    print!(".");
-                }
-            }
-            println!();
-        }
-        println!();
-    }
-}
+use std::collections::{BTreeSet, BTreeMap};
 
 fn parse_rocks() -> Vec<Vec<(i64, i64)>> {
     let mut rocks: Vec<Vec<(i64, i64)>> = Vec::new();
@@ -71,295 +29,100 @@ fn parse_rocks() -> Vec<Vec<(i64, i64)>> {
     return rocks
 }
 
-fn move_rock(rock: &mut Vec<(i64, i64)>, pos: & (i64, i64)) {
-    for (x, y) in rock {
-        *x += pos.0;
-        *y += pos.1;
+fn free(settled: &BTreeSet<(i64, i64)>, x: i64, y: i64) -> bool {
+    return (x >= 0) && (x < WIDTH) && (y > 0) && ! settled.contains(&(x, y));
+}
+
+fn can_move(settled: &BTreeSet<(i64, i64)>, piece: i64, x: i64, y: i64, rocks: &Vec<Vec<(i64, i64)>>) -> bool {
+    return rocks[piece as usize].iter().all(|(dx, dy)|  free(settled, x + dx, y + dy));
+}
+
+fn place(settled: &mut BTreeSet<(i64, i64)>, jet: i64, piece: i64, max_y: i64, jets: &Vec<char>, rocks:  &Vec<Vec<(i64, i64)>>) -> (i64, i64, i64) {
+    let mut x = 2;
+    let mut y = max_y + 5;
+    let mut new_jet = jet;
+    while can_move(settled, piece, x, y - 1, rocks) {
+        y -= 1;
+        match jets.get(new_jet as usize) {
+            Some('<') => {
+                if can_move(settled, piece, x-1, y, rocks) {
+                    x -= 1;
+                }
+            },
+            Some('>') => {
+                if can_move(settled, piece, x+1, y, rocks) {
+                    x += 1;
+                }
+            },
+            _ => {panic!()},
+        }
+        new_jet = (new_jet + 1) % (jets.len() as i64);
+    }
+    let new_cells: Vec<(i64, i64)> = rocks[piece as usize].iter().map(|(dx, dy)| (x + dx, y + dy)).collect();
+    new_cells.iter().for_each(|cell| { settled.insert(*cell); });
+    return (new_jet, (piece + 1) % rocks.len() as i64, max_y.max(new_cells.iter().map(|(_, y)| *y).max().unwrap()));
+}
+
+fn ground_shape(settled: &BTreeSet<(i64, i64)>, max_y: i64) -> Option<Vec<(i64, i64)>> {
+    let mut state: BTreeSet<(i64, i64)> = BTreeSet::new();
+    for x in 0..WIDTH {
+        search(x, 0, &mut state, max_y, settled);
+    }
+    if state.len() <= CACHE_LEN {
+        return Some(state.into_iter().collect::<Vec<(i64, i64)>>());
+    } else {
+        return None;
     }
 }
 
-fn part_a(input: &str, pattern: &Vec<char>, iters: usize) -> i64{
-    let mut score = 0;
-
-    let mut map = HashSet::new();
-    for x in 0..7 {
-        map.insert((x, 0));
+fn search(x: i64, y: i64, visited: &mut BTreeSet<(i64, i64)>, max_y: i64, settled: &BTreeSet<(i64, i64)>) {
+    if (! free(settled, x, max_y + y)) || visited.contains(&(x, y)) || visited.len() > CACHE_LEN {
+        return;
     }
+    visited.insert((x, y));
+    vec![(x - 1, y), (x + 1, y), (x, y - 1)].iter().for_each(|(nx, ny)| {
+        search(*nx, *ny, visited, max_y, settled);
+    })
+}
 
-    let rocks = parse_rocks();
-    //print_rocks(&rocks);
-    
-    //print_2d_map(&map);
+fn solve(num_rocks: i64, jets: &Vec<char>, rocks: &Vec<Vec<(i64, i64)>>) -> i64 {
+    let mut settled: BTreeSet<(i64, i64)> = BTreeSet::new();
+    let mut cycles: BTreeMap<(i64, i64, Vec<(i64, i64)>), (i64, i64)> = BTreeMap::new();
+    let mut jet = 0;
+    let mut max_y = 0;
+    let mut piece = 0;
+    let mut addl = 0;
+    let mut count = num_rocks;
 
-    let mut count = 0;
-    'new_rock: for nr in 0..iters {
-        let y_start = get_y_max(&map) + 4;
-        let x_start = 2;
-        let mut rock = rocks.get(nr%rocks.len()).unwrap().clone();
-        move_rock(&mut rock, &(x_start, y_start));
-        loop {
-            match pattern.get(count%pattern.len()).unwrap() {
-                '>' => {
-                    let mut move_possible = true;
-                    for (x, y) in &rock {
-                        if x+1 > 6 {
-                            move_possible = false;
-                            break;
-                        }
-                        match map.get(&(x+1, *y)) {
-                            Some(_) => {
-                                move_possible = false;
-                                break;
-                            },
-                            None => {},
-                        }
-                    }
-                    if move_possible {
-                        move_rock(&mut rock, &(1, 0))
-                    }
-                },
-                '<' => {
-                    // check if all parts are still inside, then move
-                    let mut move_possible = true;
-                    for (x, y) in &rock {
-                        if x-1 < 0 {
-                            move_possible = false;
-                            break;
-                        }
-                        match map.get(&(x-1, *y)) {
-                            Some(_) => {
-                                move_possible = false;
-                                break;
-                            },
-                            None => {},
-                        }
-                    }
-                    if move_possible {
-                        move_rock(&mut rock, &(-1, 0))
-                    }
-                }
-                _ => {panic!();},
+    while count > 0 {
+        (jet, piece, max_y) = place(&mut settled, jet, piece, max_y, jets, rocks);
+        count -= 1;
+        if let Some(ground) = ground_shape(&settled, max_y) {
+            if cycles.contains_key(&(jet, piece, ground.clone())) {
+                let (old_max_y, old_count) = cycles.get(&(jet, piece, ground.clone())).unwrap();
+                addl += (max_y - old_max_y) * (count / (old_count - count));
+                count %= old_count - count;
             }
-            // go to next index in jet_pattern
-            count += 1;
-
-            // check if free under, then move
-            let mut free_under = true;
-            for (x, y) in &rock {
-                match map.get(&(*x, y-1)) {
-                    Some(_) => {free_under = false;},
-                    None => {},
-                }
-            }
-            if free_under {
-                move_rock(&mut rock, &(0, -1));
-            } else {
-                
-                // new_rock
-                let mut covered_y = HashSet::new();
-                for (x, y) in rock {
-                    map.insert((x, y));
-                    covered_y.insert(y);
-                    
-                }
-                // if the row is full, remove all under
-                'new_y: for y in covered_y {
-                    for x in 0..7 {
-                        match map.get(&(x, y)) {
-                            Some(_) => {},
-                            None => {
-                                continue 'new_y;
-                            },
-                        }
-                    }
-                    //print_2d_map(&map);
-                    map.retain(|(_, b)| b>= &y);
-                    let mut new_map = HashSet::new();
-                    for (a, b) in map {
-                        new_map.insert((a, b-y));
-                    }
-                    score += y;
-                    map = new_map;
-                    //print_2d_map(&map);
-                }
-                continue 'new_rock;
-            }
+            cycles.insert((jet, piece, ground), (max_y, count));
+        } else {
+            continue;
         }
     }
-    print_2d_map(&map);
-    score += get_y_max(&map);
-    return score
+    return max_y + addl;
 }
 
-fn run_until_repeated_n_times(input: &str, jet_pattern: & Vec<char>, n_times: usize) -> (i64, usize){
-    let mut score = 0;
+const WIDTH: i64 = 7;
+const CACHE_LEN: usize = 20;
 
-    let mut map = HashSet::new();
-    for x in 0..7 {
-        map.insert((x, 0));
-    }
+fn main() {
+    // solution based code from JuniorBirdman1115
+    //let num_rocks = 2022;
+    let num_rocks = 1000000000000;
     let rocks = parse_rocks();
-
-    let mut n_repeats = 0;
-    let mut count = 0;
-    'new_rock: for rock_number in 0..10000000 {
-        let y_start = get_y_max(&map)+ 4;
-        let x_start = 2;
-        
-        let mut rock = rocks.get(rock_number%rocks.len()).unwrap().clone();
-        move_rock(&mut rock, &(x_start, y_start));
-        loop {
-            match jet_pattern.get(count%jet_pattern.len()).unwrap() {
-                '>' => {
-                    let mut move_possible = true;
-                    for (x, y) in &rock {
-                        if x+1 > 6 {
-                            move_possible = false;
-                            break;
-                        }
-                        match map.get(&(x+1, *y)) {
-                            Some(_) => {
-                                move_possible = false;
-                                break;
-                            },
-                            None => {},
-                        }
-                    }
-                    if move_possible {
-                        move_rock(&mut rock, &(1, 0))
-                    }
-                },
-                '<' => {
-                    // check if all parts are still inside, then move
-                    let mut move_possible = true;
-                    for (x, y) in &rock {
-                        if x-1 < 0 {
-                            move_possible = false;
-                            break;
-                        }
-                        match map.get(&(x-1, *y)) {
-                            Some(_) => {
-                                move_possible = false;
-                                break;
-                            },
-                            None => {},
-                        }
-                    }
-                    if move_possible {
-                        move_rock(&mut rock, &(-1, 0))
-                    }
-                }
-                _ => {panic!();},
-            }
-            // go to next index in jet_pattern
-            count += 1;
-
-            // check if free under, then move
-            let mut free_under = true;
-            for (x, y) in &rock {
-                match map.get(&(*x, y-1)) {
-                    Some(_) => {free_under = false;},
-                    None => {},
-                }
-            }
-            if free_under {
-                move_rock(&mut rock, &(0, -1));
-            } else {
-                let mut covered_y = HashSet::new();
-                for (x, y) in rock {
-                    map.insert((x, y));
-                    covered_y.insert(y);
-                    
-                }
-                if rock_number%(jet_pattern.len()) == 0 && rock_number%(rocks.len()) == 0 {
-                    //println!("score: {} iteration: {}", score, rock_number);
-                    
-                    if n_repeats == n_times {
-                        print_2d_map(&map);
-                        score = get_y_max(&map);
-                        return (score, rock_number);
-                    }
-                    n_repeats += 1;
-                }
-                continue 'new_rock;
-            }
-        }
-    }
-    panic!()
-}
-
-
-
-fn main(){
-    // Tetris
-    let mut score_a = 0;
-    let mut score_b = 0;
-    let input = include_str!("example.txt");
+    let input = include_str!("input.txt");
     let mut data = input.trim().split("\r\n");
     let line = data.next().unwrap();
-    let jet_pattern: Vec<char> = line.chars().collect();
-
-    for i in 1..10 {
-        let (score_1, nr1) = run_until_repeated_n_times(input, &jet_pattern, 1);
-        let (score_2, nr2) = run_until_repeated_n_times(input, &jet_pattern,1+i);
-        let (score_3, nr3) = run_until_repeated_n_times(input, &jet_pattern,1+i*10);
-        println!("score_1: {} \nnr1: {}", score_1, nr1);
-        println!("score_2: {} \nnr2: {}", score_2, nr2);
-        println!("score_2: {} \nnr3: {}", score_3, nr3);
-        
-        if (score_3-score_2)/(9 *i as i64) == score_2 {
-            println!("added iters {}", (i));
-        }
-    }
-    
-    //assert!((score_2-score_1)==(score_3-score_2));
-//
-    //let jet_len = jet_pattern.len();
-    //// 1 - 67
-    //// 2 - 126
-    //// 3 - 185
-    //println!("added iters {}", (nr2-nr1));
-    //let n_times = (1000000000000-nr1)/(nr2-nr1);
-    //let remains = (1000000000000-nr1)%(nr2-nr1);
-    //println!("n_times: {} \nremains: {}", n_times, remains);
-//
-    //let score_remain = part_a(input, &jet_pattern, remains);
-    //let score_b = score_1 + (score_2-score_1)*n_times as i64 + score_remain;
-    //println!();
-    ////let score_b = part_b(input);
-    //println!("Score A: {} \nScore B: {}", score_a, score_b);
-}
-
-#[cfg(test)]
-mod tests {
-    const EXAMPLE_A: i64 = 3068;
-    const SOLVE_A: i64 = 472;
-
-    const EXAMPLE_B: i64 = 29;
-    const SOLVE_B: i64 = 465;
-
-    use super::*;
-    #[test]
-    fn example_a() {
-        let input = include_str!("example.txt");
-        assert_eq!(part_a(input), EXAMPLE_A);
-    }
-
-    #[test]
-    fn example_b() {
-        let input = include_str!("example.txt");
-        assert_eq!(part_b(input), EXAMPLE_B);
-    }
-
-    #[test]
-    fn solve_a() {
-        let input = include_str!("input.txt");
-        assert_eq!(part_a(input), SOLVE_A);
-    }
-
-    #[test]
-    fn solve_b() {
-        let input = include_str!("input.txt");
-        assert_eq!(part_b(input), SOLVE_B);
-    }
+    let jets: Vec<char> = line.chars().collect();
+    let score = solve(num_rocks, &jets, &rocks);
+    println!("score {}", score);
 }

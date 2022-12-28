@@ -1,266 +1,247 @@
-use std::{collections::HashMap, borrow::Borrow, hash::Hash};
+use std::{collections::{BinaryHeap, HashSet, HashMap, BTreeSet, VecDeque}, cmp::Ordering};
+use itertools::Itertools;
 
-#[derive(Debug)]
-#[derive(Clone)]
-#[derive(Copy)]
-struct Connection<'a> {
-    dest: &'a str,
-    cost: i32,
+struct Valve<'a> {
+    flow: u32, 
+    neighbours: HashSet<&'a str>,
 }
 
-#[derive(Debug)]
-#[derive(Clone)]
+#[derive(PartialEq, Eq)]
 struct Node<'a> {
-    name: &'a str,
-    rate: i32,
-    state: bool,
-    connections: Vec<Connection<'a>>,
+    cost: u32, 
+    curr: &'a str,
 }
 
-fn remove_by_name<'a>(map: &mut HashMap<&str, Node<'a>>, name: &str){
-    let node_to_remove = &map.get(name).unwrap().to_owned();
-
-    let mut shortened_paths = HashMap::new();
-    let mut new_paths = HashMap::new();
-
-    for (this_name, valve) in map.iter_mut() {
-        let mut new_tunnels = Vec::new();
-
-        for tunnel in &valve.connections {
-            // if tunnel leads to removed_node, dont add it
-            if tunnel.dest == node_to_remove.name {
-                for zer_tunnel in &node_to_remove.connections {
-                    if zer_tunnel.dest == valve.name {
-                        // dont add conections to self
-                    } else {
-                        let new_con = Connection{
-                            dest: zer_tunnel.dest,
-                            cost: zer_tunnel.cost + tunnel.cost,
-                        };
-                        new_paths.insert(*this_name, new_con);
-                        new_tunnels.push(new_con);
-                    }
-                }
-            } else {
-                let mut new_old_tunnel = *tunnel;
-                // update cost of existing items 
-                for alternative_tunnel in &node_to_remove.connections {
-                    // only add existing if its shorted
-                    // how to update the same connection in the other direciton?
-                    let new_cost = alternative_tunnel.cost + tunnel.cost;
-                    if  new_cost< new_old_tunnel.cost {
-                        new_old_tunnel.cost = new_cost;
-                        shortened_paths.insert(*this_name, new_old_tunnel);
-                    }  
-                }
-                new_tunnels.push(new_old_tunnel)
-            }
-        }
-        valve.connections = new_tunnels;
+impl<'a> Ord for Node<'a> {
+    fn cmp(&self, other: &Self) -> Ordering {
+        other.cost.cmp(&self.cost)
     }
-
-    for (from, path) in shortened_paths {
-        for (node_name, node) in map.iter_mut() {
-            if *node_name == from {
-                for tunnel in node.connections.iter_mut() {
-                    if tunnel.dest == path.dest {
-                        tunnel.cost = path.cost;
-                    }
-                }
-            }
-        }
-    }
-    for (from, path) in new_paths {
-        for (node_name, node) in map.iter_mut() {
-            if *node_name == from {
-                for tunnel in node.connections.iter_mut() {
-                    if tunnel.dest == path.dest {
-                        tunnel.cost = path.cost;
-                    }
-                }
-            }
-        }
-    }
-    map.remove(name);
 }
 
+impl<'a> PartialOrd for Node<'a> {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
 
-fn part_a(input: &str) -> i32 {
+fn min_cost(from: &str, to: &str, map: &HashMap<&str, Valve>) -> u32 {
+    let mut priority_que = BinaryHeap::new();
+    let mut seen = HashSet::new();
+
+    priority_que.push(Node {
+        cost: 0,
+        curr: from,
+    });
+    seen.insert(from);
+
+    while let Some(Node {cost, curr}) = priority_que.pop() {
+        if curr == to {
+            return cost;
+        }
+
+        for neighbour in map[curr].neighbours.iter() {
+            if seen.insert(neighbour) {
+                priority_que.push(Node {
+                    cost: cost + 1,
+                    curr: neighbour,
+                });
+            }
+        }
+    }
+    u32::MAX
+}
+
+fn parse(input: &str) -> HashMap<&str, Valve> {
     let mut data = input.trim().split("\r\n");
-    let mut score = 0;
-
-    let mut map: HashMap<&str, Node> = HashMap::new();
-    let mut zero_nodes: Vec<&str> = Vec::new();
+    let mut map: HashMap<&str, Valve> = HashMap::new();
 
     while let Some(line) = data.next() {
         let (name, rest) = line.split_once(" has").unwrap();
         let (_, name) = name.split_once(' ').unwrap();
         let (rate, rest) = rest.split_once(";").unwrap();
         let (_, rate) = rate.split_once("=").unwrap();
-        let rate: i32 = rate.parse().unwrap();
+        let rate: u32 = rate.parse().unwrap();
         let (_, con_str) = rest.split_once("valves ").unwrap();
 
-        let mut connections = Vec::new();
-        for connection in con_str.split(", ").into_iter() {
-            connections.push(Connection{
-                dest: connection, 
-                cost: 1
-            })
-        }
-        let mut node = Node{
-            name,
-            rate,
-            state: false,
-            connections: connections,
-        };
-        if rate == 0 && name != "AA" {
-            zero_nodes.push(name);
-        }
-        if name == "AA" {
-            node.state = true;
-        }
-        map.insert(name, node);
+        map.insert(name,  
+            Valve{
+                flow: rate,
+                neighbours: con_str.split(", ").collect(),
+            }
+        );
     }
-
-    println!("Starting map:");
-    for line in map.iter() {
-        println!("{:?}", line);
-    }
-    println!();
-    for node_to_remove in zero_nodes {
-        println!("Removing {}", node_to_remove);
-        remove_by_name(&mut map, node_to_remove);
-        println!("Result");
-        for line in map.iter() {
-            println!("{:?}", line);
-        }
-    }
-
-    let time0 = 0;
-    let flow_rate = 0;
-    let total_flow = 0;
-    let position = "AA";
-    for this_move in map.get(position).unwrap().to_owned().connections {
-        //let time = time0 + this_move.cost;
-        make_move(&map, position, &this_move, total_flow, flow_rate, time0, &mut score);
-    }
-
-    return score
+    return map;
 }
 
+fn min_distances<'a>(map: &'a HashMap<&str, Valve>) -> HashMap<(&'a str, &'a str), u32> {
+    map.iter()
+        .filter(|(_, valve)| valve.flow > 0)
+        .map(|(&name, _)| name)
+        .tuple_combinations()
+        .fold(HashMap::new(), |mut acc, (name1, name2)| {
+            acc.entry(("AA", name1))
+                .or_insert_with(|| min_cost("AA", name1, map));
+            acc.entry(("AA", name2))
+                .or_insert_with(|| min_cost("AA", name2, map));
 
-const MAX_TIME: i32 = 30;
+            let dist = min_cost(name1, name2, map);
+            acc.insert((name1, name2), dist);
+            acc.insert((name2, name1), dist);
 
-fn make_move(map: & HashMap<&str, Node>, position: &str, this_move: &Connection, total_flow: i32, flow_rate: i32, time: i32, score: &mut i32) {
-    let new_time= time + this_move.cost;
-    if new_time > MAX_TIME {
-        //println!("{}", time);
-        let total_flow = total_flow + (MAX_TIME-time)*flow_rate;
-        //println!("over time {}, {}, {}", new_time, total_flow, flow_rate);
-        if total_flow > *score {
-            *score = total_flow;
+            acc
+        })
+}
+
+struct State<'a> {
+    opened: BTreeSet<&'a str>,
+    curr: &'a str, 
+    elapsed: u32, 
+    relieved: u32,
+}
+
+fn wait_until_ending(
+    max_time: u32,
+    elapsed: u32,
+    relieved: u32,
+    opened: &BTreeSet<&str>,
+    map: &HashMap<&str, Valve>,
+) -> u32 {
+    let time_left = max_time - elapsed;
+    let relieved_per_min: u32 = opened.iter().map(|name| &map[name].flow).sum();
+    relieved + (relieved_per_min * time_left)
+}
+
+fn part_a(input: &str) -> u32 {
+    let max_time = 30;
+    let map = parse(input);
+    let dist_map = min_distances(&map);
+    let flowing: HashSet<_> = map.iter()
+        .filter(|(_, valve)| valve.flow > 0)
+        .map(|(&name, _)| name)
+        .collect();
+    let mut max_relieved = 0;
+    let mut que = VecDeque::new();
+    let mut seen = HashSet::new();
+
+    que.push_back(State {
+        curr: "AA",
+        opened: BTreeSet::new(),
+        elapsed: 0,
+        relieved: 0,
+    });
+    seen.insert((BTreeSet::new(), 0, 0));
+
+    while let Some(State {
+        opened, 
+        curr, 
+        elapsed, 
+        relieved,
+    }) = que.pop_front() {
+        if opened.len() == flowing.len() || elapsed >= max_time {
+            let relieved_at_end = wait_until_ending(max_time, elapsed, relieved, &opened, &map);
+            max_relieved = max_relieved.max(relieved_at_end);
+            continue;
         }
-        return;
+
+        let unopened = flowing.iter().filter(|name| !opened.contains(*name));
+        for dest in unopened {
+            let cost = dist_map[&(curr, *dest)] + 1;
+            let new_elapsed = elapsed + cost;
+
+            if new_elapsed >= max_time {
+                let relieved_at_end = wait_until_ending(max_time, elapsed, relieved, &opened, &map);
+                max_relieved = max_relieved.max(relieved_at_end);
+                continue;
+            }
+
+            let relieved_per_min: u32 = opened.iter().map(|name| &map[name].flow).sum();
+            let new_relieved = relieved + (relieved_per_min * cost);
+
+            let mut new_opened = opened.clone();
+            new_opened.insert(dest);
+
+            if seen.insert((new_opened.clone(), new_elapsed, new_relieved)) {
+                que.push_back(State {
+                    opened: new_opened,
+                    curr: dest,
+                    elapsed: new_elapsed,
+                    relieved: new_relieved,
+                });
+            }
+        }
     }
+    return max_relieved;
+}
 
-    //println!("total_flow {}, flow_rate {}, this_move.cost {}", total_flow, flow_rate, this_move.cost.to_owned());
-    let total_flow = total_flow + flow_rate*this_move.cost;
+fn part_b(input: &str) -> u32 {
+    let max_time = 26;
+    let map = parse(input);
+    let dist_map = min_distances(&map);
 
-    let mut new_map = map.clone();
 
-    //println!("position {} - {}, time {}", position, this_move.dest, new_time);
-
-    let mut new_flow_rate = flow_rate;
-    let mut new_pos = position;
-    if this_move.dest == position {
-        let node = new_map.get_mut(this_move.dest).unwrap();
-        node.state = true;
-        new_flow_rate += node.rate;
-    } else {
-        new_pos = this_move.dest;
-    }
+    let flowing: HashSet<_> = map.iter()
+        .filter(|(_, valve)| valve.flow > 0)
+        .map(|(&name, _)| name)
+        .collect();
+    let mut max_relieved_states: HashMap<BTreeSet<&str>, u32> = HashMap::new();
     
-    //for line in new_map.iter() {
-    //    println!("{:?}", line);
-    //}
-    
-    //println!("new pos {}", new_pos);
-    let mut node = new_map.get(new_pos).unwrap();
-    let mut possible_moves = node.connections.clone();
-    //println!("possible_moves {:?}", possible_moves);
+    let mut que = VecDeque::new();
+    que.push_back(State {
+        curr: "AA",
+        opened: BTreeSet::new(),
+        elapsed: 0,
+        relieved: 0,
+    });
 
-    if !node.state {
-        if node.rate > 15 {
-            possible_moves = vec![Connection{dest: new_pos, cost: 1}]
-        } else {
-            possible_moves.push(Connection{dest: new_pos, cost: 1}); // add posibility to open vault 
-        }  
-    } else {
-        // valve is already open, and we are moving awawy => dont come back
-        remove_by_name(&mut new_map, new_pos);
-    }
+    while let Some(State {
+        opened, 
+        curr, 
+        elapsed, 
+        relieved,
+    }) = que.pop_front() {
+        let relieved_at_end = wait_until_ending(max_time, elapsed, relieved, &opened, &map);
+        max_relieved_states
+            .entry(opened.clone())
+            .and_modify(|val| *val = relieved_at_end.max(*val))
+            .or_insert(relieved_at_end);
 
-    if possible_moves.is_empty() {
-        let mut end_flow = total_flow;
-        if new_time < MAX_TIME {
-            end_flow += (MAX_TIME - new_time)*new_flow_rate;
+        let unopened = flowing.iter().filter(|name| !opened.contains(*name));
+        for dest in unopened {
+            let cost = dist_map[&(curr, *dest)] + 1;
+            let new_elapsed = elapsed + cost;
+
+            if new_elapsed >= max_time {
+                continue;
+            }
+
+            let relieved_per_min: u32 = opened.iter().map(|name| &map[name].flow).sum();
+            let new_relieved = relieved + (relieved_per_min * cost);
+
+            let mut new_opened = opened.clone();
+            new_opened.insert(dest);
+
+            que.push_back(State {
+                opened: new_opened,
+                curr: dest,
+                elapsed: new_elapsed,
+                relieved: new_relieved,
+            });
         }
-        *score = *score.max(&mut end_flow);
-        return;
     }
-    for move_to_make in possible_moves {
-        make_move(&new_map, new_pos, &move_to_make, total_flow, new_flow_rate, new_time, score);
-    }
+    max_relieved_states
+        .iter()
+        .tuple_combinations()
+        .filter(|(human, elephant)| human.0.is_disjoint(elephant.0))
+        .map(|(human, elephant)| human.1 + elephant.1)
+        .max()
+        .unwrap()
 }
 
-
-fn part_b(input: &str) -> i32{
-    let mut data = input.trim().split("\r\n");
-    let mut score = 0;
-
-    return score
-}
-
-
-
-fn main(){
+fn main() {
+    // code based on NickyMeuleman's solution
     let input = include_str!("input.txt");
     let score_a = part_a(input);
-    println!();
-    let score_b = part_b(input);
-    println!("Score A: {} \nScore B: {}", score_a, score_b);
-}
-
-#[cfg(test)]
-mod tests {
-    const EXAMPLE_A: i32 = 31;
-    const SOLVE_A: i32 = 472;
-
-    const EXAMPLE_B: i32 = 29;
-    const SOLVE_B: i32 = 465;
-
-    use super::*;
-    #[test]
-    fn example_a() {
-        let input = include_str!("example.txt");
-        assert_eq!(part_a(input), EXAMPLE_A);
-    }
-
-    #[test]
-    fn example_b() {
-        let input = include_str!("example.txt");
-        assert_eq!(part_b(input), EXAMPLE_B);
-    }
-
-    #[test]
-    fn solve_a() {
-        let input = include_str!("input.txt");
-        assert_eq!(part_a(input), SOLVE_A);
-    }
-
-    #[test]
-    fn solve_b() {
-        let input = include_str!("input.txt");
-        assert_eq!(part_b(input), SOLVE_B);
-    }
+    println!("Score A {}", score_a);
+    let score_b= part_b(input);
+    println!("Score B {}", score_b)
 }

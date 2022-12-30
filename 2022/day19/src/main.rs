@@ -101,7 +101,7 @@ impl Blueprint {
             None => {
                 // Don't evaluate any branch that can not be better than our current best. 
                 // This is critial to save time
-                let time_left = *time0 as u32 - 1;
+                let time_left = *time0 as u32;
                 let mut new_goedes: u32 = (1..=time_left).sum();
                 new_goedes += income0[3]*time_left + resources0[3];
                 if new_goedes < *most {

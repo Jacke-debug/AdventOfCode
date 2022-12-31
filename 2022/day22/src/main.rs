@@ -401,7 +401,7 @@ fn part_b(input: &str) -> isize {
 fn main() {
     let input = include_str!("input.txt");
     let score_a = part_a(input);
-    println!("Score A {}", score_a);   
+    println!("Score A {}", score_a);  // 106094
     let score_b = part_b(input); 
-    println!("Score B {}", score_b); // 141286 low < x <186067 high
+    println!("Score B {}", score_b); // 162038
 }

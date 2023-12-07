@@ -22,9 +22,7 @@ fn part_a(input: &str) -> u64 {
         let lower = (time/2.0) - ((time*time/4.0 - record) as f64).sqrt(); 
 
         let nr_sols = upper.floor() as u64 - lower.ceil() as u64 + 1;
-        println!("{}, {}", lower, upper);
         score *= nr_sols as u64;
-        println!("{:?}", nr_sols);
     }
 
     return score;
@@ -49,9 +47,7 @@ fn part_b(input: &str) -> u64 {
         let lower = (time/2.0) - ((time*time/4.0 - record) as f64).sqrt(); 
 
         let nr_sols = upper.floor() as u64 - lower.ceil() as u64 + 1;
-        println!("{}, {}", lower, upper);
         score *= nr_sols as u64;
-        println!("{:?}", nr_sols);
     }
     return score;
 }

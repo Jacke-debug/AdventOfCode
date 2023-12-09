@@ -5,7 +5,6 @@ fn get_derivative(data: &[i64]) -> Vec<i64> {
         let diff = data[i] - data[i - 1];
         derivative.push(diff);
     }
-
     derivative
 }
 
@@ -14,7 +13,6 @@ fn part_a(input: &str) -> (i64, i64) {
     let mut score_b = 0;
 
     let mut lines = input.trim().split("\r\n");
-
     for line in lines {
         let sequence: Vec<i64> = line.split_whitespace().map(|s| s.parse().unwrap()).collect();
         let mut derivatives = get_derivative(&sequence);
@@ -26,7 +24,6 @@ fn part_a(input: &str) -> (i64, i64) {
             derivatives = get_derivative(&derivatives);
         }
         score_a += last_elements.iter().sum::<i64>();
-        
         score_b += first_elements.iter().rev().fold(0, |acc, &elem| elem - acc);
         continue;
     }

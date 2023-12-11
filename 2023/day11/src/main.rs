@@ -12,78 +12,58 @@ fn transpose(map: &Vec<Vec<i64>>) -> Vec<Vec<i64>> {
         .collect()
 }
 
-fn expand_universe(map: &Vec<Vec<i64>>) -> (Vec<i64>, Vec<i64>) {
-    let mut rows = Vec::new();
-    let mut cols = Vec::new();
+fn expand_universe(map: &Vec<Vec<i64>>) -> Vec<i64> {
+    let mut expanded_indices = Vec::new();
     for (idx, row) in map.iter().enumerate() {
         if row.iter().all(|x| *x == 0) {
-            rows.push(idx as i64)
+            expanded_indices.push(idx as i64)
         }
     }
-    let transposed_map = transpose(map);
-    for (idx, row) in transposed_map.iter().enumerate() {
-        if row.iter().all(|x| *x == 0) {
-            cols.push(idx as i64)
-        }
-    }
-    return (rows, cols);
+    return expanded_indices
 } 
 
 fn part_a(input: &str, expanded_distance: i64) -> i64 {
-    let mut score = 0;
-    let lines = input.trim().split("\r\n");
+    let mut answer = 0;
     let mut map = Vec::new();
-    let mut galaxy_count = 1;
-    for (y, line) in lines.enumerate() {
+    let mut galaxies: HashSet<(i64, i64)> = HashSet::new();
+    for (y, line) in input.trim().split("\r\n").enumerate() {
         let mut row = Vec::new();
         for (x, ch) in line.chars().enumerate() {
             match ch {
                 '#' => {
-                    row.push(galaxy_count);
-                    galaxy_count += 1;
+                    row.push(1);
+                    galaxies.insert((x as i64, y as i64));
                 },
                 _ => row.push(0),
             }
         }
         map.push(row);
     }
-    let (expanded_rows, expanded_cols) = expand_universe(&map);
-
-    let mut galaxies = HashSet::new();
-    for (x, row) in map.iter().enumerate() {
-        for (y, item) in row.iter().enumerate() {
-            if *item > 0 {
-                galaxies.insert((x as i64, y as i64));
-            }
-        }
-    }
-
+    let expanded_rows = expand_universe(&map);
+    let expanded_cols = expand_universe(&transpose(&map));
+    
     for g1 in galaxies.iter() {
         for g2 in galaxies.iter() {
             if g1 != g2 {
                 let mut x_dist = 0;
                 let mut y_dist = 0;
                 for x in g2.0.min(g1.0)..g2.0.max(g1.0) {
-                    if expanded_rows.contains(&x) {
-                        x_dist += expanded_distance
-                    } else {
-                        x_dist += 1
+                    if expanded_cols.contains(&x) {
+                        x_dist += expanded_distance-1
                     }
-                    
+                    x_dist += 1
                 }
                 for y in g2.1.min(g1.1).. g2.1.max(g1.1) {
-                    if expanded_cols.contains(&y) {
-                        y_dist += expanded_distance
-                    } else {
-                        y_dist += 1
+                    if expanded_rows.contains(&y) {
+                        y_dist += expanded_distance-1
                     }
-                    
+                    y_dist += 1
                 }
-                score += x_dist + y_dist
+                answer += x_dist + y_dist
             }
         }
     }
-    return score/2
+    return answer/2
 }
 
 

@@ -65,10 +65,51 @@ fn part_a(input: &str) -> usize {
     return answer;
 }
 
+fn part_b(input: &str) -> usize {
+    let mut answer = 0;
+    let maps: Vec<&str> = input.trim().split_terminator("\r\n\r\n").collect();
+    
+    'outer: for map_str in maps {
+        let map: Vec<Vec<char>> = map_str
+            .lines()
+            .map(|line| line.chars().collect())
+            .collect();
+        for (i, row) in map.iter().enumerate() {
+            for (j, &cell) in row.iter().enumerate() {
+                let mut new_map = map.clone();
+                match new_map[i][j] {
+                    '.' => {new_map[i][j]='#'},
+                    '#' => {new_map[i][j]='.'},
+                    _ => panic!()
+                }
+
+                match find_mirroring_line(&map) {
+                    Some(x) => answer+=x*100,
+                    None => {
+                        match find_mirroring_line(&transpose(&map)) {
+                            Some(x) => {
+                                answer+=x;
+                                continue 'outer;
+                            },
+                            None => continue,
+                        }
+                    }
+                    
+                }
+
+            }
+        }
+        
+    }
+    return answer;
+}
+
+
 
 fn main() {
     let input = include_str!("input.txt");
     let ans_a = part_a(input);
-    println!("Part A: {:?}", ans_a);
-    //29213
+    println!("Part A: {:?}", ans_a); // 29213
+    let ans_b = part_b(input);
+    println!("Part B: {:?}", ans_b);   
 }

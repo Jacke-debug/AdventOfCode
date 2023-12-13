@@ -22,7 +22,7 @@ fn transpose(map: &Vec<Vec<char>>) -> Vec<Vec<char>> {
         .collect()
 }
 
-fn find_mirroring_line(map: &Vec<Vec<char>>) -> Option<usize> {
+fn find_mirroring_line(map: &Vec<Vec<char>>, old_solution: Option<usize>) -> Option<usize> {
     let height = map.len();
     'outer: for idx in 1..height {
         let mut pre_mirror: Vec<Vec<char>> = map[0..idx].to_vec();
@@ -35,6 +35,9 @@ fn find_mirroring_line(map: &Vec<Vec<char>>) -> Option<usize> {
             pre_mirror = pre_mirror[0..post_mirror.len()].to_vec();
         }
         if pre_mirror == post_mirror {
+            if Some(idx) == old_solution {
+                continue;
+            }
             return Some(idx);
         }
     }
@@ -51,10 +54,10 @@ fn part_a(input: &str) -> usize {
             .map(|line| line.chars().collect())
             .collect();
         
-        match find_mirroring_line(&map) {
+        match find_mirroring_line(&map, None) {
             Some(x) => answer+=x*100,
             None => {
-                match find_mirroring_line(&transpose(&map)) {
+                match find_mirroring_line(&transpose(&map), None) {
                     Some(x) => answer+=x,
                     None => panic!(),
                 }
@@ -74,6 +77,21 @@ fn part_b(input: &str) -> usize {
             .lines()
             .map(|line| line.chars().collect())
             .collect();
+
+        let mut orig_rows = None;
+        let mut orig_col = None;
+        match find_mirroring_line(&map, None) {
+            Some(x) => orig_rows=Some(x),
+            None => {
+                match find_mirroring_line(&transpose(&map), None) {
+                    Some(x) => orig_col=Some(x),
+                    None => panic!(),
+                }
+            }
+            
+        }
+
+
         for (i, row) in map.iter().enumerate() {
             for (j, &cell) in row.iter().enumerate() {
                 let mut new_map = map.clone();
@@ -82,11 +100,13 @@ fn part_b(input: &str) -> usize {
                     '#' => {new_map[i][j]='.'},
                     _ => panic!()
                 }
-
-                match find_mirroring_line(&map) {
-                    Some(x) => answer+=x*100,
+                match find_mirroring_line(&new_map, orig_rows) {
+                    Some(x) => {
+                        answer+=x*100;
+                        continue 'outer;
+                    },
                     None => {
-                        match find_mirroring_line(&transpose(&map)) {
+                        match find_mirroring_line(&transpose(&new_map), orig_col) {
                             Some(x) => {
                                 answer+=x;
                                 continue 'outer;
@@ -96,10 +116,9 @@ fn part_b(input: &str) -> usize {
                     }
                     
                 }
-
             }
         }
-        
+        panic!()
     }
     return answer;
 }
@@ -111,5 +130,5 @@ fn main() {
     let ans_a = part_a(input);
     println!("Part A: {:?}", ans_a); // 29213
     let ans_b = part_b(input);
-    println!("Part B: {:?}", ans_b);   
+    println!("Part B: {:?}", ans_b);  // 37453
 }

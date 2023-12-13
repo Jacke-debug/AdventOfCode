@@ -62,7 +62,6 @@ fn part_a(input: &str) -> usize {
             
         }
     }
-
     return answer;
 }
 

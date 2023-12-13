@@ -1,5 +1,3 @@
-use std::{collections::HashMap, io::empty};
-
 fn print_map(map: &Vec<Vec<char>>) {
     println!();
     for row in map {

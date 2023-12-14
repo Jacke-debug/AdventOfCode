@@ -13,6 +13,7 @@ fn print_map(map: &Vec<Vec<char>>) {
 fn transpose(map: &Vec<Vec<char>>) -> Vec<Vec<char>> {
     let num_rows = map.len();
     let num_columns = map[0].len();
+    print_map(&map);
     (0..num_columns)
         .map(|col_index| {
             (0..num_rows)
@@ -46,7 +47,7 @@ fn find_mirroring_line(map: &Vec<Vec<char>>, old_solution: Option<usize>) -> Opt
 
 fn part_a(input: &str) -> usize {
     let mut answer = 0;
-    let maps: Vec<&str> = input.trim().split_terminator("\r\n\r\n").collect();
+    let maps: Vec<&str> = input.trim().split_terminator("\n\n").collect();
     
     for map_str in maps {
         let map: Vec<Vec<char>> = map_str

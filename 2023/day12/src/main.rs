@@ -46,67 +46,44 @@ fn reduce_problem(map: &mut VecDeque<char>, groups: &mut VecDeque<usize>, nr_arr
 }
 
 fn solve(map: &mut VecDeque<char>, groups: &mut VecDeque<usize>, nr_arrangements: &mut usize){
-    let no_solution = reduce_problem(map, groups, nr_arrangements);
-    if no_solution {
-        return;
-    }
-    if map.is_empty() && groups.is_empty() {
-        *nr_arrangements += 1; //?
-        println!("Reduction solved {}", nr_arrangements);
-        return;
-    }
-    println!("After reduction {:?}, {:?}", map, groups);
-    // check posibilities for first remaining group
     let group = match groups.pop_front() {
         Some(x) => {x},
         None => {
-            *nr_arrangements += 1; //?
-            println!(" nr_arrangements {}", nr_arrangements);
+            *nr_arrangements += 1;
             return;
         },
     };
-    let required_size: i32 = groups.len() as i32 + groups.iter().sum::<usize>() as i32;
-    if (map.len() as i32) < required_size {
-        println!("Remaing map too small");
-        return;
-    }
-
-    'place_next: for place_index in 0..map.len()-required_size as usize {
-        println!("place index {}, for group {}", place_index, group);
+    'place_next: for place_index in 0..map.len() as usize {
         for idx in 0..place_index{
             match map.get(idx) {
-                Some('#') => {continue 'place_next},
-                _ => {}
+                Some('#') => {return}, // # can't be skipped
+                Some(_) => {}, 
+                None => return
             }
         }
         for idx in place_index..place_index+group {
             match map.get(idx) {
-                Some('.') => {continue 'place_next},
+                Some('.') => {continue 'place_next}, // not possible there
                 Some(_) => continue,
-                None => {continue 'place_next},
+                None => {return},
             }
         }
-        if groups.len() == 0 {
-            *nr_arrangements+=1;
-            println!("No more groups to place, nr_arrangements {}", nr_arrangements);
+        if groups.is_empty() {
+            *nr_arrangements += 1;
             continue 'place_next;
         }
         match map.get(place_index+group) {
             Some('#') => {
-                println!("Can't insert . after group ");
-                continue;
+                continue 'place_next;
              } 
             Some(_) => {
                 let mut new_map = map.clone();
                 let mut new_groups = groups.clone();
-                if place_index+group+1 >= new_map.len() {
-                    continue 'place_next;
-                }
                 new_map.drain(..place_index+group+1);
                 solve(&mut new_map, &mut new_groups, nr_arrangements);
             }
             None => {
-                continue 'place_next;
+                return;
             }
         }
     }
@@ -127,9 +104,6 @@ fn part_a(input: &str) -> usize {
         solve(&mut map, &mut groups, &mut nr_arrangements);
         println!("Nr {} Solutions {}", nr, nr_arrangements);
         answer += nr_arrangements;
-        if nr ==1 {
-            continue;
-        }
     }
     return answer
 }
@@ -139,7 +113,7 @@ fn main() {
     let input = include_str!("input.txt");
     let ans_a = part_a(input);
     println!("Part A: {:?}", ans_a);
-    // 5055 low, 7957 wrong, 9495 wrong, 8929 wrong, 9437, 8451
+    // 5055 low, 7957 wrong, 9495 wrong, 8929 wrong, 9437, 8451, 7763, 8451
 }
 
 

@@ -1,74 +1,36 @@
 use core::panic;
-use std::collections::VecDeque;
+use std::collections::{VecDeque, HashMap};
 
-fn reduce_problem(map: &mut VecDeque<char>, groups: &mut VecDeque<usize>, nr_arrangements: &mut usize) -> bool {
-    let mut size_changed = true;
-    while size_changed && map.len()>0{
-        let orig_size = map.len();
-
-        if map.front()== Some(&'#') {
-            println!("popping front");
-            let len = match groups.pop_front() {
-                Some(x) => {x},
-                None => {
-                    return true}, // no more ponds to place, done
-            };
-            let map_size = map.len();
-            if len > map_size {
-                return true;
-            }
-            map.drain(..len); // drain specifies indices to remove...
-        }
-        
-        if map.back() == Some(&'#') {
-            println!("popping back");
-            let len = match groups.pop_back() {
-                Some(x) => {x},
-                None => {return true}, // no more ponds to place, done
-            };
-            let map_size = map.len();
-            if len > map_size {
-                return true;
-            }
-            map.drain(map_size-len..);
-        }
-        
-        while let Some('.') = map.back() {
-            map.pop_back();
-        }
-        while let Some('.') = map.front() {
-            map.pop_front();
-        }
-
-        size_changed = map.len() < orig_size;
-    }
-    return false;
-}
-
-fn solve(map: &mut VecDeque<char>, groups: &mut VecDeque<usize>, nr_arrangements: &mut usize){
+fn solve(map: & VecDeque<char>, groups: &mut VecDeque<usize>, nr_arrangements: &mut usize){
     let group = match groups.pop_front() {
         Some(x) => {x},
         None => {
-            *nr_arrangements += 1;
-            return;
+            panic!();
         },
     };
-    'place_next: for place_index in 0..map.len() as usize {
+    'place_next: for place_index in 0..=map.len() as usize {
         for idx in 0..place_index{
             match map.get(idx) {
                 Some('#') => {return}, // # can't be skipped
-                Some(_) => {}, 
-                None => return
+                Some('.') | Some('?') => {}, 
+                _ => {panic!()}
             }
         }
         for idx in place_index..place_index+group {
             match map.get(idx) {
                 Some('.') => {continue 'place_next}, // not possible there
-                Some(_) => continue,
-                None => {return},
+                Some('#') | Some('?') => continue,
+                Some(_) => panic!(),
+                _ => {return},
             }
         }
         if groups.is_empty() {
+            for idx in place_index+group..=map.len() {
+                match map.get(idx) {
+                    Some('#') => continue 'place_next, // solution not valid
+                    _ => {}
+                }
+            }
             *nr_arrangements += 1;
             continue 'place_next;
         }
@@ -90,30 +52,152 @@ fn solve(map: &mut VecDeque<char>, groups: &mut VecDeque<usize>, nr_arrangements
 
 }
 
-fn part_a(input: &str) -> usize {
-    let mut answer = 0;
-    for (nr, line) in input.trim().split("\r\n").enumerate() {
-        let (map, groups) = line.split_once(' ').unwrap();
-        let mut groups: VecDeque<usize> = groups.split(',').map(|s| s.parse::<usize>().unwrap()).collect();
-        let mut map = map.to_string()
-            .trim_start_matches('.')
-            .trim_end_matches('.')
-            .chars().collect();
-        let mut nr_arrangements: usize = 0;
+const OPERATIONAL: u8 = b'.';
+const DAMAGNED: u8 = b'#';
+const UNKOWN: u8 = b'?';
 
-        solve(&mut map, &mut groups, &mut nr_arrangements);
-        println!("Nr {} Solutions {}", nr, nr_arrangements);
-        answer += nr_arrangements;
+fn arragments(data: &[u8], groups: &[u32])-> u64 {
+    let mut cache = HashMap::new();
+    let ans = dfs(&mut cache, data, groups, 0, 0, 0);
+    ans
+}
+
+fn dfs(
+    cache: &mut HashMap<(usize, usize, u32), u64>,
+    data: &[u8],
+    groups: &[u32],
+    from: usize,
+    group: usize,
+    size: u32,
+) -> u64 {
+    if from >= data.len() {
+        if group >= groups.len() {
+            return 1;
+        }
+
+        if group == groups.len() - 1 && groups[group]==size {
+            return 1;
+        }
+
+        return 0;
     }
-    return answer
+
+    match data[from] {
+        OPERATIONAL => {
+            if size == 0 {
+                return dfs(cache, data, groups, from+1, group, size);
+            }
+
+            if group >= groups.len() || size != groups[group] {
+                return 0;
+            }
+            return dfs(cache, data, groups, from+1, group+1, 0);
+        }
+        DAMAGNED => {
+            if group >= groups.len() || size + 1 > groups[group]{
+                return 0;
+            }
+
+            return dfs(cache, data, groups, from + 1 , group, size+1);
+        }
+        UNKOWN => {
+            if let Some(answer) = cache.get(&(from, group, size)).copied() {
+                return answer;
+            }
+
+            let mut ways = 0;
+            if size == 0 {
+                ways += dfs(cache, data, groups, from +1, group, size);
+            }
+
+            if group < groups.len() && size < groups[group] {
+                ways += dfs(cache, data, groups, from +1, group, size +1);
+            }
+
+            if group < groups.len() && size == groups[group] {
+                ways += dfs(cache, data, groups, from +1, group +1, 0);
+            }
+            cache.insert((from, group, size), ways);
+            return ways;
+        }
+        _ => unreachable!()
+        
+    }
+}
+
+fn part_a(input: &str, nr_folds: usize) -> u64 {
+    input.lines()
+        .map(|l| l.rsplit_once(' ').unwrap())
+        .map(|(l, r)| {
+            (
+                l.trim(),
+                r.trim()
+                    .split(',')
+                    .map(|x| x.parse().unwrap())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .map(|(data, groups)| {
+            let mut expanded_data = String::new();
+            for _ in 0..nr_folds-1 {
+                expanded_data.push_str(data);
+                expanded_data.push_str("?");
+            }
+            expanded_data.push_str(data);
+ 
+            let expanded_groups = groups.repeat(nr_folds);
+            (expanded_data, expanded_groups)
+        })
+        .map(|(data, groups)| arragments(data.as_bytes(), &groups))
+        .sum()
 }
 
 
+fn part_a_old(input: &str, nr_folds: usize) -> usize {
+    let mut answer = 0;
+    let lines = input
+        .lines()
+        .map(|l| l.rsplit_once(' ').unwrap())
+        .map(|(l, r)| {
+            (
+                l.trim(),
+                r.trim()
+                    .split(',')
+                    .map(|x| x.parse::<usize>().unwrap())
+                    .collect::<Vec<_>>(),
+            )
+        })
+        .map(|(data, groups)| {
+            let mut expanded_data = String::new();
+            for _ in 0..nr_folds-1 {
+                expanded_data.push_str(data);
+                expanded_data.push_str("?");
+            }
+            expanded_data.push_str(data);
+ 
+            let expanded_groups = groups.repeat(nr_folds);
+            (expanded_data, expanded_groups)
+        });
+
+        
+    for (idx, (map, groups)) in lines.enumerate() {
+        println!("idx {}", idx);
+        let mut nr_arrangements: usize = 0;
+        let mut map = map.chars().collect();
+        let mut groups:VecDeque<usize> = groups.clone().into();
+        solve(&map, &mut groups, &mut nr_arrangements);
+        answer += nr_arrangements;
+    }
+    return answer;
+}
+
 fn main() {
     let input = include_str!("input.txt");
-    let ans_a = part_a(input);
+    let ans_a = part_a_old(input, 1);
     println!("Part A: {:?}", ans_a);
-    // 5055 low, 7957 wrong, 9495 wrong, 8929 wrong, 9437, 8451, 7763, 8451
+
+    let ans_b = part_a_old(input, 5);
+    println!("Part B: {:?}", ans_b);
 }
 
 
@@ -124,46 +208,54 @@ mod tests {
     #[test]
     fn ex0() {
         let input = "???.### 1,1,3";
-        assert_eq!(part_a(input), 1);
+        assert_eq!(part_a(input, 1), 1);
     }
     #[test]
     fn ex1() {
         let input = ".??..??...?##. 1,1,3";
-        assert_eq!(part_a(input), 4);
+        assert_eq!(part_a(input, 1), 4);
     }
     #[test]
     fn ex2() {
         let input = "?#?#?#?#?#?#?#? 1,3,1,6";
-        assert_eq!(part_a(input), 1);
+        assert_eq!(part_a(input, 1), 1);
     }
     #[test]
     fn ex3() {
         let input = "????.#...#... 4,1,1";
-        assert_eq!(part_a(input), 1);
+        assert_eq!(part_a(input, 1), 1);
     }
     #[test]
     fn ex4() {
         let input = "????.######..#####. 1,6,5";
-        assert_eq!(part_a(input), 4);
+        assert_eq!(part_a(input, 1), 4);
     }
     #[test]
     fn ex5() {
         let input = "?###???????? 3,2,1";
-        assert_eq!(part_a(input), 10);
+        assert_eq!(part_a(input, 1), 10);
     }
     #[test]
     fn in0() {
         let input = "#?#.??????#.??????? 3,2,1,1,7";
-        assert_eq!(part_a(input), 3);
+        assert_eq!(part_a(input, 1), 3);
     }
     #[test]
     fn in1() {
         let input = "????? 2,1";
-        assert_eq!(part_a(input), 3);
+        assert_eq!(part_a(input, 1), 3);
     }
     #[test]
     fn in2() {
         let input = "??#?#????#?#????. 8,7";
-        assert_eq!(part_a(input), 1);
+        assert_eq!(part_a(input, 1), 1);
+        let input = "..????..?????? 1,3";
+        assert_eq!(part_a(input, 1), 19);
+        let input = "?#????#???????? 2,1,3,1";
+        assert_eq!(part_a(input, 1), 33);
+        let input = "?.?????#???????? 1,4,2,1";
+        assert_eq!(part_a(input, 1), 61);
     }
+    
+
 }

@@ -39,64 +39,64 @@ fn solve(beam_map: & HashMap<(usize, usize), Vec<char>>, active_beams: & Vec<((u
     while any_new_beams {
         let mut new_beams: Vec<((usize, usize), char)> = Vec::new();
         for (pos, dir) in active_beams {
-            let next_pos = match get_next_pos(&dir, &pos) {
-                Some(x) => {x},
-                None => continue // beam moves outside map
-            };
-            match map.get(&next_pos) {
+            match map.get(&pos) {
                 Some('-') => {
                     match dir {
                         '>' | '<' => {
-                            new_beams.push((next_pos, dir));
+                            new_beams.push((pos, dir));
                         } // pass thorugh
                         _ => {
-                            new_beams.push((next_pos, '<'));
-                            new_beams.push((next_pos, '>'));
+                            new_beams.push((pos, '<'));
+                            new_beams.push((pos, '>'));
                         } 
                     }
                 },
                 Some('|') => {
                     match dir {
-                        '^' | 'v' => {new_beams.push((next_pos, dir));} // pass thorugh
+                        '^' | 'v' => {new_beams.push((pos, dir));} // pass thorugh
                         _ => {
-                            new_beams.push((next_pos, '^'));
-                            new_beams.push((next_pos, 'v'));
+                            new_beams.push((pos, '^'));
+                            new_beams.push((pos, 'v'));
                         }
                     }
                 },
                 Some('/') => {
                     match dir {
-                        '^' => {new_beams.push((next_pos, '>'));} 
-                        '<' => {new_beams.push((next_pos, 'v'));}
-                        '>' => {new_beams.push((next_pos, '^'));}
-                        _ => {new_beams.push((next_pos, '<'));}
+                        '^' => {new_beams.push((pos, '>'));} 
+                        '<' => {new_beams.push((pos, 'v'));}
+                        '>' => {new_beams.push((pos, '^'));}
+                        _ => {new_beams.push((pos, '<'));}
                     }
                 },
                 Some('\\') => {
                     match dir {
-                        '^' => {new_beams.push((next_pos, '<'));} 
-                        '<' => {new_beams.push((next_pos, '^'));}
-                        '>' => {new_beams.push((next_pos, 'v'));}
-                        _ => {new_beams.push((next_pos, '>'));}
+                        '^' => {new_beams.push((pos, '<'));} 
+                        '<' => {new_beams.push((pos, '^'));}
+                        '>' => {new_beams.push((pos, 'v'));}
+                        _ => {new_beams.push((pos, '>'));}
                     }
                 },
-                Some('.') => {new_beams.push((next_pos, dir));},
+                Some('.') => {new_beams.push((pos, dir));},
                 _ => {},
             }
         }
-        // check if beam already has been traced
+
         active_beams = Vec::new();
         any_new_beams = false;
         for (pos, dir) in new_beams {
-            match beam_map.get_mut(&pos) {
+            let updated_pos = match get_next_pos(&dir, &pos) {
+                Some(x) => {x},
+                None => continue // beam moves outside map
+            };
+            match beam_map.get_mut(&updated_pos) {
                 Some(v) => {
                     if !v.contains(&dir) {
                         v.push(dir); // new beam that we need to follow
-                        active_beams.push((pos, dir));
+                        active_beams.push((updated_pos, dir));
                         any_new_beams =true;
                     } 
                 }
-                None => {panic!()}
+                None => {} // beam moves outside
             }
         }
     }
@@ -133,21 +133,23 @@ fn part_b(input: &str) -> usize {
     let mut score = 0;
     for x in [0, x_max] {
         for y in 0..=y_max { 
-            let mut active_beams = Vec::new();
-            for dir in ['v', '^'] {
+            for dir in ['<', '>'] {
+                let mut active_beams = Vec::new();
                 active_beams.push(((x,y), dir));
-                beam_map.insert((x,y), vec![dir]);
-                score = score.max(solve(&beam_map, &active_beams, &map, x_max, y_max));
+                let mut beam_map_this = beam_map.clone();
+                beam_map_this.insert((x,y), vec![dir]);
+                score = score.max(solve(&beam_map_this, &active_beams, &map, x_max, y_max));
             }
         }
     }
     for x in 0..=x_max {
         for y in [0, y_max] { 
-            let mut active_beams = Vec::new();
-            for dir in ['<', '>'] {
+            for dir in ['^', 'v'] {
+                let mut active_beams = Vec::new();
                 active_beams.push(((x,y), dir));
-                beam_map.insert((x,y), vec![dir]);
-                score = score.max(solve(&beam_map, &active_beams, &map, x_max, y_max));
+                let mut beam_map_this = beam_map.clone();
+                beam_map_this.insert((x,y), vec![dir]);
+                score = score.max(solve(&beam_map_this, &active_beams, &map, x_max, y_max));
             }
         }
     }
@@ -156,11 +158,11 @@ fn part_b(input: &str) -> usize {
 }
 
 fn main() {
-    let input = include_str!("example.txt");
+    let input = include_str!("input.txt");
     let ans_a = part_a(input);
     println!("Part A: {}", ans_a);
     let ans_b = part_b(input);
-    println!("Part B: {}", ans_b); // 87683 low
+    println!("Part B: {}", ans_b); 
 }
 
 

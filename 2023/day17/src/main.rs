@@ -1,4 +1,4 @@
-use std::{collections::{HashMap, HashSet}, arch::x86_64, vec};
+use std::{collections::{HashMap, HashSet, VecDeque}, arch::x86_64, vec};
 
 
 fn print_map(map: &[Vec<u32>]) {
@@ -12,30 +12,31 @@ fn print_map(map: &[Vec<u32>]) {
 
 #[derive(Clone)]
 #[derive(Debug)]
-struct state {
+struct State {
     pos: (usize, usize),
     dir: (i32, i32),
     consequitive: usize,
     cost: usize,
 }
 
-fn part_a(input: &str) -> usize {
+fn part_a(input: &str, min: usize, max: usize) -> usize {
     let mut map = Vec::new();
     for line in input.lines() {
         let row: Vec<u32> = line.chars().map(|c| c.to_digit(10).unwrap()).collect();
         map.push(row);
     }
-    print_map(&map);
+    // print_map(&map);
 
-    let state = state{
+    let start_state = State{
         pos: (0, 0),
         dir: (0, 0),
         consequitive: 0,
         cost: 0,
     };
 
-    let mut solutions: HashMap<(usize, usize), Vec<state>> = HashMap::new();
-    walk_map(&map, & state, &mut solutions);
+    let mut solutions: HashMap<(usize, usize), Vec<State>> = HashMap::new();
+
+    walk_map(&map, start_state, &mut solutions, min, max);
     let y_max = map.len()-1;
     let x_max = map.get(0).unwrap().len()-1;
     println!("val {:?}", map[y_max][x_max]);
@@ -49,13 +50,18 @@ fn part_a(input: &str) -> usize {
     return 0;
 }
 
-fn walk_map(map: & Vec<Vec<u32>>, start_state: & state, solutions: &mut HashMap<(usize, usize), Vec<state>>) {
-    let mut stack = vec![start_state];
+fn walk_map(map: & Vec<Vec<u32>>, 
+    start_state: State, 
+    solutions: &mut HashMap<(usize, usize), Vec<State>>,
+    min_consqutive: usize, 
+    max_consqutive: usize, 
+) {
+    let mut stack: VecDeque<State> = vec![start_state].into();
+    let y_max = map.len()-1;
+    let x_max: usize = map.get(0).unwrap().len()-1;
 
-    while let Some(this_state) = stack.pop() {
-        let y_max = map.len()-1;
-        let x_max = map.get(0).unwrap().len()-1;
-
+    let directions: HashSet<_> = vec![(0, 1), (0, -1), (-1, 0), (1, 0)].into_iter().collect();
+    'outer: while let Some(this_state) = stack.pop_front() {
         match solutions.get_mut(&this_state.pos) {
             Some(vec_states) => {
                 let mut found_better_path = false;
@@ -68,7 +74,9 @@ fn walk_map(map: & Vec<Vec<u32>>, start_state: & state, solutions: &mut HashMap<
                             found_better_path = true;
                             break;
                         } else if this_state.consequitive >= st.consequitive && this_state.cost >= st.cost {
-                            return; // better way to get to equivalaent state
+                            continue 'outer; // better way to get to equivalaent state
+                        } else if this_state.cost >st.cost+2*9*min_consqutive as usize {
+                            continue 'outer;
                         }
                     }
                 }
@@ -82,42 +90,60 @@ fn walk_map(map: & Vec<Vec<u32>>, start_state: & state, solutions: &mut HashMap<
             }
         }
         if this_state.pos == (y_max, x_max) {
-            return; // target reached
+            continue; // target reached
         }
-        let directions: HashSet<_> = vec![(0, 1), (0, -1), (-1, 0), (1, 0)].into_iter().collect();
-
-        let mut forbidden_moves = HashSet::new();
+        let mut forbidden_moves: HashSet<(i32, i32)> = HashSet::new();
         forbidden_moves.insert((this_state.dir.0*-1, this_state.dir.1*-1));  // can't go back
-        if this_state.consequitive == 2 {
+        if this_state.consequitive == max_consqutive {
             forbidden_moves.insert(this_state.dir);
         }
-        for new_dir in directions.difference(&forbidden_moves) {
-            let mut new_state = this_state.clone();
+        'new_dir: for new_dir in directions.difference(&forbidden_moves) {
+            let mut new_x = this_state.pos.1; 
+            let mut new_y: usize = this_state.pos.0;
+            let mut consequitve = 0;
+            let mut added_cost = 0; 
 
             if *new_dir == this_state.dir {
-                new_state.consequitive += 1;
-            } else {
-                new_state.consequitive = 0;
-            }
-
-            let new_x = (this_state.pos.1 as i32 + new_dir.1) as usize;
-            let new_y = (this_state.pos.0 as i32 + new_dir.0) as usize;
-
-            match map.get(new_y ) {
-                Some(row) => {
-                    match row.get(new_x) {
-                        Some(c) => new_state.cost += *c as usize,
-                        None => continue,
-                    }                
+                consequitve = this_state.consequitive + 1;
+                new_x = (new_x as i32 + new_dir.1) as usize;
+                new_y = (new_y as i32 + new_dir.0) as usize;
+                match map.get(new_y ) {
+                    Some(row) => {
+                        match row.get(new_x) {
+                            Some(c) => added_cost += *c as usize,
+                            None => continue 'new_dir,
+                        }
+                    }
+                    None => {
+                        continue 'new_dir// walking outisde map not possible
+                    }
                 }
-                None => {
-                    continue // walking outisde map not possible
-                }  
+            } else {
+                for i in 0..min_consqutive {
+                    consequitve += 1;
+                    new_x = (new_x as i32 + new_dir.1) as usize;
+                    new_y = (new_y as i32 + new_dir.0) as usize;
+                    match map.get(new_y ) {
+                        Some(row) => {
+                            match row.get(new_x) {
+                                Some(c) => added_cost += *c as usize,
+                                None => continue 'new_dir,
+                            }
+                        }
+                        None => {
+                            continue 'new_dir// walking outisde map not possible
+                        }
+                    }
+                }
             }
-            new_state.pos = (new_y , new_x);
-            new_state.dir = *new_dir;
-            //walk_map(map, &mut new_state, solutions)
-            stack.push(new_state);
+            
+            let new_state = State { 
+                pos: (new_y , new_x), 
+                dir: (*new_dir), 
+                consequitive: (consequitve), 
+                cost: (this_state.cost + added_cost) 
+            };
+            stack.push_back(new_state);
         }
     }
 }
@@ -129,11 +155,10 @@ fn part_b(input: &str) -> usize {
 }
 
 fn main() {
-
     let input = include_str!("input.txt");
-    let ans_a = part_a(input);
-    println!("Part A: {}", ans_a);
-    let ans_b = part_b(input);
+    //let ans_a = part_a(input, 1, 3);
+    //println!("Part A: {}", ans_a);
+    let ans_b = part_a(input, 4, 10);
     println!("Part B: {}", ans_b); 
 }
 
@@ -145,11 +170,16 @@ mod tests {
     #[test]
     fn test_a_example() {
         let input = include_str!("example.txt");
-        assert_eq!(part_a(input), 102);
+        assert_eq!(part_a(input, 1, 3), 102);
     }
-    //#[test]
+    #[test]
     fn test_b_example() {
         let input = include_str!("example.txt");
-        assert_eq!(part_b(input), 51);
+        assert_eq!(part_a(input, 4, 10), 94);
+    }
+    #[test]
+    fn test_b_example2() {
+        let input = include_str!("example2.txt");
+        assert_eq!(part_a(input, 4, 10), 71);
     }
 }

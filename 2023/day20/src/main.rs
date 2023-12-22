@@ -1,102 +1,197 @@
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 
-// broadcast, send any received 
-
-// & conjunction, remember last pulse, init low, high for all -> send low, else send_low ->
-struct conjunction<'a> {
-    name: &'a str,
-    last_pulse: bool, 
-    inputs: Vec<bool>,
+fn gcd(mut a: u64, mut b: u64) -> u64 {
+    while b != 0 {
+        let temp = b;
+        b = a % b;
+        a = temp;
+    }
+    a
 }
 
-// % flip-flop, init off, high ignore, low -> switch between on and off
+fn lcm(a: u64, b: u64) -> u64 {
+    if a == 0 || b == 0 {
+        0
+    } else {
+        (a * b) / gcd(a, b)
+    }
+}
+
+fn smallest_common_divisor(numbers: &Vec<u64>) -> u64 {
+    if numbers.is_empty() {
+        return 0; // or handle the case appropriately
+    }
+    let result = numbers.iter().fold(numbers[0], |acc, &num| lcm(acc, num));
+    result
+}
+
+
 #[derive(Debug, Clone)]
 struct node<'a> {
-    name: &'a str,
     component: &'a str, 
     state: bool, 
     inputs: HashMap<&'a str, bool>,
+    receivers: Vec<&'a str>,
 }
 
 
-fn part_a(input: &str) -> isize {
+
+fn part_a(input: &str) -> (isize, isize) {
     let mut nodes: HashMap<&str, node<'_>> = HashMap::new();
-    let mut receiver_map: HashMap<&str, Vec<&str>> = HashMap::new();
+    let mut output_nodes = HashMap::new();
+
     for line in input.lines() {
-        println!("{}", line);
         let (sender, receivers) = line.split_once(" -> ").unwrap();
         let name: &str = sender.get(1..).unwrap();
 
-        for receiver in  receivers.split(", ") {
-            match receiver_map.get_mut(&receiver) {
-                Some(vec) => vec.push(receiver),
-                None => {
-                    receiver_map.insert(name, vec![receiver]);
-                }
-            }
+        let receivers: Vec<&str> =  receivers.split(", ").collect();
+        if receivers.contains(&"hf") {
+            output_nodes.insert(name, 0);
         }
 
         match sender.chars().nth(0) {
             Some('%') => {
                 nodes.insert(name, node {
-                    name,
                     component: "flip_flop",
                     state: false,
                     inputs: HashMap::new(),
+                    receivers: receivers,
                 });
             }
             Some('&') => {
                 nodes.insert(name, node {
-                    name,
                     component: "conjunction",
                     state: false,
                     inputs: HashMap::new(),
+                    receivers: receivers,
                 });
             }
             Some('b') => {
-                nodes.insert("roadcaster", node {
-                    name: "roadcaster",
+                let mut b_node = node {
                     component: "roadcaster",
                     state: false,
                     inputs: HashMap::new(),
-                });
+                    receivers: receivers,
+                };
+                let mut button_node = node {
+                    component: "roadcaster",
+                    state: false,
+                    inputs: HashMap::new(),
+                    receivers: vec!["roadcaster"],
+                };
+                b_node.inputs.insert("button", false);
+                nodes.insert("roadcaster", b_node);
+                nodes.insert("button", button_node);
             }
             Some(_) => unreachable!(),
             None => unreachable!(),
         }
     }
 
-    for (node_id, senders) in receiver_map.iter() {
-        let node = match nodes.get_mut(node_id) {
-            Some(x) => {x},
-            None => {
-                println!("Unkown rec {}", node_id);
-                continue;
-            },
-        };
-        for sender in senders {
-            node.inputs.insert(sender, false);
+    
+    let binding = nodes.clone();
+    for (sender_id, sender) in binding.iter() {
+        for rec_id in &sender.receivers {
+            let node = match nodes.get_mut(rec_id) {
+                Some(x) => {x},
+                None => {
+                    // a node that does not send further, pulse dies here
+                    continue;
+                },
+            };
+            node.inputs.insert(sender_id, false);
         }
+        
     }
+    let mut high_pulses = 0;
+    let mut low_pulses = 0;
 
-    println!();
-    for _ in 0..1000 {
+    //output_node.inputs
+
+    'outer: for idx in 0..100000 {
+        let mut stack: VecDeque<(&str, bool)> = VecDeque::from(vec![("button", false)]);
         // low -> broadcaster
-        let active_node = receiver_map.get("roadcaster").unwrap();
-        for node_id in active_node {
-
+        while let Some((sender_id, pulse)) = stack.pop_front() {
+            let sender = nodes.get(sender_id).unwrap().clone();
+            
+            for rec_id in sender.receivers.iter() {
+                if pulse {
+                    high_pulses += 1;
+                    match output_nodes.get_mut(sender_id) {
+                        Some(iters) => {
+                            if *iters == 0 {
+                                *iters = idx+1; // number of button presses
+                            }
+                        }
+                        None =>{}
+                    }
+                } else {
+                    low_pulses += 1;
+                }
+                let receiver= match nodes.get_mut(rec_id) {
+                    Some(x) => {x},
+                    None => {
+                        if !pulse {
+                            break 'outer;
+                        }
+                        continue;
+                    },
+                };
+                let output = match receiver.component {
+                    "roadcaster" => {
+                        // broadcast, send any received
+                        Some(pulse)
+                    }
+                    "flip_flop" => {
+                        // % flip-flop, init off, high ignore, low -> switch between on and off
+                        if pulse {
+                            None
+                        } else {
+                            receiver.state = !receiver.state;
+                            Some(receiver.state)
+                        }
+                    }
+                    "conjunction" => {
+                        // & conjunction, remember last pulse, init low, high for all -> send low, else send_low ->
+                        match receiver.inputs.get_mut(sender_id) {
+                            Some(val) => {
+                                *val = pulse;
+                            },
+                            None => {
+                                println!("{:?}", rec_id);
+                                panic!()},
+                        }
+                        if receiver.inputs.values().all(|v| *v) {
+                            Some(false)
+                        } else {
+                            Some(true)
+                        }
+                    }
+                    _ => panic!()
+                };
+                match output {
+                    Some(b) => {
+                        stack.push_back((rec_id, b))
+                    }
+                    None => {continue}
+                }
+            }
         }
     }
-    println!("{:?}", nodes);
 
-    return 0
+    println!("{:?}", output_nodes);
+    let vec: Vec<u64> = output_nodes.values().map(|x| *x as u64).collect();
+    let scd = smallest_common_divisor(&vec);
+    let mut ans_b = scd as isize; // 987608569081 low
+    return (low_pulses*high_pulses, ans_b)
 }
 
-
 fn main() {
-    let input = include_str!("example.txt");
-    let ans_a= part_a(input);
+    let input = include_str!("input.txt");
+    let (ans_a, ans_b)= part_a(input);
     println!("Part A: {}", ans_a);
+    println!("Part B: {}", ans_b);
+    // 807069600
 }
 
 
@@ -108,6 +203,6 @@ mod tests {
     #[test]
     fn test_a_example() {
         let input = include_str!("example.txt");
-        assert_eq!(part_a(input), 32000000);
+        assert_eq!(part_a(input), (32000000, 0));
     }
 }

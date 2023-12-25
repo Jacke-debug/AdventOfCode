@@ -1,8 +1,4 @@
-use std::collections::btree_set::Intersection;
-
 use itertools::Itertools;
-use ndarray::prelude::*;
-use ndarray_linalg::{Solve, Scalar};
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 struct Coord {
@@ -45,7 +41,7 @@ impl Hailstone {
 }
 
 
-fn get_intersection(h1: &Hailstone, h2: &Hailstone) -> Option<(f64, f64)> {
+fn get_intersection_2d(h1: &Hailstone, h2: &Hailstone) -> Option<(f64, f64)> {
     let determinant = (h1.vel.x * h2.vel.y - h1.vel.y * h2.vel.x) as f64;
 
     if determinant == 0.0 {
@@ -77,7 +73,7 @@ fn part_a(input: &str, area: (f64, f64)) -> usize {
     let (lower, upper) = area;
     let mut collisions = 0;
     for combinations in hailstones.iter().combinations(2) {
-        if let Some(intersection) = get_intersection(combinations[0], combinations[1]){
+        if let Some(intersection) = get_intersection_2d(combinations[0], combinations[1]){
             let (x, y) = intersection;
             
             if (x > lower && x < upper) && (y > lower && y < upper) {
@@ -89,32 +85,22 @@ fn part_a(input: &str, area: (f64, f64)) -> usize {
 }
 
 fn find_intersection_3d(p1_0: Coord, v1: Coord, p2_0: Coord, v2: Coord) -> Option<Coord> {
-    
-    // C = p1_0
-    // e = v1
-
-    // D = p2_0
-    // f = v2 
-
-    // g = C->D = (p2_0 - p1_0)
+    // cred https://math.stackexchange.com/questions/270767/find-intersection-of-two-3d-lines
     let g = Coord::new(p2_0.x - p1_0.x, p2_0.y - p1_0.y, p2_0.z - p1_0.z);
     let h = v2.cross(&g).abs();
     let k = v2.cross(&v1).abs();
     if h == 0.0 || k == 0.0{
         return None;
     }
-    // M = C +/- L
-
     let intersection = Coord::new(
         p1_0.x + (v1.x as f64 *h/k).round() as isize,
         p1_0.y + (v1.y as f64 *h/k).round() as isize,
         p1_0.z + (v1.z as f64*h/k).round() as isize,
     );
-
     Some(intersection)
 }
 
-fn part_b(input: &str) -> isize {
+fn part_b(input: &str) -> Option<isize> {
     let mut hailstones = Vec::new();
     for line in input.lines() {
         let (pos, vel) = line.split_once(" @ ").unwrap();
@@ -126,12 +112,12 @@ fn part_b(input: &str) -> isize {
     let max_vel = hailstones.iter().map(|x| x.vel.x.max(x.vel.y).max(x.vel.z)).max().unwrap();
     let min_vel = hailstones.iter().map(|x| x.vel.x.min(x.vel.y).min(x.vel.z)).min().unwrap();
     let max_vel = max_vel.max(min_vel.abs());
-    println!("Max vel: {}", max_vel);
     
     let stones: Vec<Hailstone> = hailstones.iter().take(3).cloned().collect();
 
-    let mut anser = Coord::new(0, 0 ,0);
-    let max_vel = 300;
+    let mut throw_pos = None;
+    let max_vel = 300; // adjust as needed
+    println!("Max vel: {}", max_vel);
     'outer: for vx in -max_vel..=max_vel {
         for vy in -max_vel..=max_vel {
             'vz: for vz in -max_vel..=max_vel {
@@ -158,8 +144,8 @@ fn part_b(input: &str) -> isize {
                 }
                 match intersect {
                     Some(i) => {
-                        println!("intersec {:?}", i);
-                        anser = i;
+                        println!("found intersection {:?}", i);
+                        throw_pos = Some(i);
                         break 'outer
                     }
                     _ => {}
@@ -168,36 +154,21 @@ fn part_b(input: &str) -> isize {
             }
         }
     }
-    return anser.x + anser.y + anser.z
+    match throw_pos {
+        Some(pos) =>{
+            return Some(pos.x + pos.y + pos.z)
+        }
+        None => return None
+    }
 }
-
 
 fn main() {
     let input = include_str!("input.txt");
-    //let ans_a = part_a(input, (200000000000000.0, 400000000000000.0));
-    //println!("Part A: {}", ans_a); 
+    let ans_a = part_a(input, (200000000000000.0, 400000000000000.0));
+    println!("Part A: {}", ans_a); 
     let ans_b = part_b(input);
-    println!("Part B: {}", ans_b); 
+    println!("Part B: {}", ans_b.unwrap()); 
 }
-
-fn find_intersection_point(p1_0: Coord, v1: Coord, p2_0: Coord, v2: Coord) -> Option<Coord> {
-    let det: f64 = (v1.x * (v2.y * v1.z - v2.z * v1.y)
-        - v1.y * (v2.x * v1.z - v2.z * v1.x)
-        + v1.z * (v2.x * v1.y - v2.y * v1.x)) as f64;
-
-    if det == 0.0 {
-        return None; // Lines are parallel
-    }
-
-
-    let intersection = Coord::new(
-        0, 0 ,0
-    );
-
-    Some(intersection)
-}
-
-
 
 #[cfg(test)]
 mod tests {

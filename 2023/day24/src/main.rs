@@ -1,3 +1,5 @@
+use std::time::Instant;
+
 use itertools::Itertools;
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -22,7 +24,7 @@ impl Coord {
         let x = self.x as f64;
         let y = self.y as f64;
         let z = self.z as f64;
-        (x*x + y*y + x*x).sqrt()
+        (x*x + y*y + z*z).sqrt()
     }
 }
 
@@ -39,7 +41,6 @@ impl Hailstone {
         }
     }
 }
-
 
 fn get_intersection_2d(h1: &Hailstone, h2: &Hailstone) -> Option<(f64, f64)> {
     let determinant = (h1.vel.x * h2.vel.y - h1.vel.y * h2.vel.x) as f64;
@@ -75,7 +76,6 @@ fn part_a(input: &str, area: (f64, f64)) -> usize {
     for combinations in hailstones.iter().combinations(2) {
         if let Some(intersection) = get_intersection_2d(combinations[0], combinations[1]){
             let (x, y) = intersection;
-            
             if (x > lower && x < upper) && (y > lower && y < upper) {
                 collisions +=1;
             }
@@ -89,13 +89,13 @@ fn find_intersection_3d(p1_0: Coord, v1: Coord, p2_0: Coord, v2: Coord) -> Optio
     let g = Coord::new(p2_0.x - p1_0.x, p2_0.y - p1_0.y, p2_0.z - p1_0.z);
     let h = v2.cross(&g).abs();
     let k = v2.cross(&v1).abs();
-    if h == 0.0 || k == 0.0{
+    if h == 0.0 || k == 0.0 {
         return None;
     }
     let intersection = Coord::new(
         p1_0.x + (v1.x as f64 *h/k).round() as isize,
         p1_0.y + (v1.y as f64 *h/k).round() as isize,
-        p1_0.z + (v1.z as f64*h/k).round() as isize,
+        p1_0.z + (v1.z as f64 *h/k).round() as isize,
     );
     Some(intersection)
 }
@@ -112,16 +112,12 @@ fn part_b(input: &str) -> Option<isize> {
     let max_vel = hailstones.iter().map(|x| x.vel.x.max(x.vel.y).max(x.vel.z)).max().unwrap();
     let min_vel = hailstones.iter().map(|x| x.vel.x.min(x.vel.y).min(x.vel.z)).min().unwrap();
     let max_vel = max_vel.max(min_vel.abs());
-    
     let stones: Vec<Hailstone> = hailstones.iter().take(3).cloned().collect();
 
-    let mut throw_pos = None;
-    let max_vel = 300; // adjust as needed
-    println!("Max vel: {}", max_vel);
-    'outer: for vx in -max_vel..=max_vel {
+    println!("Max vel: {}", max_vel); // can lower max-vel for faster solving
+    for vx in -max_vel..=max_vel {
         for vy in -max_vel..=max_vel {
             'vz: for vz in -max_vel..=max_vel {
-                //println!("test V: {:?},{},{}", vx, vy, vz);
                 let mut rel_hail = stones.clone();
                 let mut intersect = None;
                 for hail in rel_hail.iter_mut() {
@@ -140,13 +136,13 @@ fn part_b(input: &str) -> Option<isize> {
                             }
                             None => intersect = Some(candidate),
                         }
+                    } else {
+                       continue 'vz;
                     }
                 }
                 match intersect {
                     Some(i) => {
-                        println!("found intersection {:?}", i);
-                        throw_pos = Some(i);
-                        break 'outer
+                        return Some(i.x + i.y + i.z);
                     }
                     _ => {}
                 }
@@ -154,20 +150,19 @@ fn part_b(input: &str) -> Option<isize> {
             }
         }
     }
-    match throw_pos {
-        Some(pos) =>{
-            return Some(pos.x + pos.y + pos.z)
-        }
-        None => return None
-    }
+    return None
 }
 
 fn main() {
+    let start_time = Instant::now();
+
     let input = include_str!("input.txt");
     let ans_a = part_a(input, (200000000000000.0, 400000000000000.0));
     println!("Part A: {}", ans_a); 
     let ans_b = part_b(input);
     println!("Part B: {}", ans_b.unwrap()); 
+
+    println!("Elapsed time: {:?}", Instant::now()-start_time);
 }
 
 #[cfg(test)]
@@ -192,6 +187,6 @@ mod tests {
     #[test]
     fn test_b_example() {
         let input = include_str!("example.txt");
-        assert_eq!(part_b(input), 47);
+        assert_eq!(part_b(input), Some(47));
     }
 }

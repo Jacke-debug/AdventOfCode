@@ -1,7 +1,7 @@
-use std::time::Instant;
 use std::collections::HashSet;
+use std::time::Instant;
 
-fn _print_map(map: &Vec<Vec<char>>) {
+fn _print_map(map: &[Vec<char>]) {
     for row in map.iter() {
         for c in row.iter() {
             print!("{}", c);
@@ -23,7 +23,7 @@ fn generate_map(input: &str) -> Vec<Vec<char>> {
     map
 }
 
-fn is_outside(map: &Vec<Vec<char>>, x: isize, y: isize) -> bool {
+fn is_outside(map: &[Vec<char>], x: isize, y: isize) -> bool {
     x < 0 || x >= map.len() as isize || y < 0 || y >= map[0].len() as isize
 }
 
@@ -34,13 +34,19 @@ fn solve(input: &str, part_b: bool) -> isize {
 
     let mut antinodes = HashSet::new();
     for frequency in frequencies {
-        let coords: Vec<(isize, isize)> = map.iter()
+        let coords: Vec<(isize, isize)> = map
+            .iter()
             .enumerate()
             .flat_map(|(row, vec)| {
-                vec.iter()
-                    .enumerate()
-                    .filter_map(move |(col, &ch)| if ch == frequency { Some((row as isize, col as isize)) } else { None })
-            }).collect();
+                vec.iter().enumerate().filter_map(move |(col, &ch)| {
+                    if ch == frequency {
+                        Some((row as isize, col as isize))
+                    } else {
+                        None
+                    }
+                })
+            })
+            .collect();
         for p1 in &coords {
             for p2 in &coords {
                 if p1 == p2 {
@@ -53,8 +59,8 @@ fn solve(input: &str, part_b: bool) -> isize {
                     antinodes.insert(*p1);
                     antinodes.insert(*p2);
                 }
-                for i in 1..=len as isize{
-                    let antinode = (p1.0 + i*dy, p1.1 + i*dx);
+                for i in 1..=len as isize {
+                    let antinode = (p1.0 + i * dy, p1.1 + i * dx);
                     if is_outside(&map, antinode.0, antinode.1) {
                         continue;
                     }
@@ -85,14 +91,14 @@ pub mod tests {
     #[test]
     fn example_a() {
         let input = include_str!("example.txt");
-        let ans = solve(&input, false);
+        let ans = solve(input, false);
         assert_eq!(ans, 14);
     }
-    
+
     #[test]
     fn example_b() {
         let input = include_str!("example.txt");
-        let ans = solve(&input, true);
+        let ans = solve(input, true);
         assert_eq!(ans, 34);
     }
 }

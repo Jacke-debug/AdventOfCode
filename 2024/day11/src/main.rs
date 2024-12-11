@@ -1,39 +1,36 @@
-use std::time::Instant;
+use std::{collections::HashMap, time::Instant};
 
 fn solve(input: &str, iters: usize) -> usize {
-    let mut stones: Vec<usize> = input.split_ascii_whitespace()
+    let mut stone_map: HashMap<usize, usize> = input
+        .split_ascii_whitespace()
         .map(|s| s.parse::<usize>().unwrap())
-        .collect();
-
-    for i in 0..iters {
-        let mut to_add = Vec::new();
-        println!("{i}");
-        println!("{:?}", stones);
-        for (i, stone) in stones.iter_mut().enumerate() {
+        .fold(HashMap::new(), |mut map, stone| {
+            *map.entry(stone).or_insert(0) += 1;
+            map
+        });
+    for _ in 0..iters {
+        let mut new_map = HashMap::new();
+        for (stone, cnt) in stone_map.iter_mut() {
             match *stone {
                 0 => {
-                    *stone = 1;
-                },
+                    *new_map.entry(1).or_insert(0) += *cnt;
+                }
                 n => {
                     let n_digits = n.to_string().len();
-                    if n_digits % 2 == 0{
-                        let a: usize = n.to_string()[0..n_digits/2].parse().unwrap();
-                        let b: usize = n.to_string()[n_digits/2..n_digits].parse().unwrap();
-                        *stone = a;
-                        to_add.push((i+1, b));
+                    if n_digits % 2 == 0 {
+                        let a: usize = n.to_string()[0..n_digits / 2].parse().unwrap();
+                        let b: usize = n.to_string()[n_digits / 2..n_digits].parse().unwrap();
+                        *new_map.entry(a).or_insert(0) += *cnt;
+                        *new_map.entry(b).or_insert(0) += *cnt;
                     } else {
-                        *stone = *stone*2024;
+                        *new_map.entry(*stone * 2024).or_insert(0) += *cnt;
                     }
                 }
             }
         }
-        let mut extra = 0;
-        for (t, a) in &to_add {
-            stones.insert(t+extra, *a);
-            extra+=1;
-        }
+        stone_map = new_map;
     }
-    stones.len()
+    stone_map.values().sum()
 }
 
 fn main() {
@@ -43,7 +40,7 @@ fn main() {
     assert_eq!(ans, 183248);
 
     let ans = solve(input, 75);
-    assert_eq!(ans, 1182);
+    assert_eq!(ans, 218811774248729);
 
     println!("Time: {} ms", start.elapsed().as_millis());
 }
@@ -55,7 +52,7 @@ pub mod tests {
     #[test]
     fn example_a_1() {
         let input = include_str!("example.txt");
-        let ans = solve(input, 10);
+        let ans = solve(input, 6);
         assert_eq!(ans, 22);
     }
 

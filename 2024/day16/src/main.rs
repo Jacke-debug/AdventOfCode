@@ -16,8 +16,8 @@ impl Pos {
 
 
     // let straight = Move{rotation: Pos::new(1, 0), cost: 1};
-    // let left = Move{rotation: Pos::new(0, 1), cost: 1001}; 
-    // let right = Move{rotation: Pos::new(0, -1), cost: 1001}; 
+    // let left = Move{rotation: Pos::new(0, 1), cost: 1001};
+    // let right = Move{rotation: Pos::new(0, -1), cost: 1001};
     fn rotate(self, other: Pos) -> Pos {
         if other.x > 0 {
             Pos {
@@ -108,9 +108,9 @@ fn read_map(input: &str) -> (HashMap<Pos, char>, Reindeer, Pos) {
 }
 
 fn update_visited(
-    visited: &mut HashMap<Reindeer, (isize, Vec<Pos>)>, 
-    reindeer: &Reindeer, 
-    points: isize, 
+    visited: &mut HashMap<Reindeer, (isize, Vec<Pos>)>,
+    reindeer: &Reindeer,
+    points: isize,
     path: &Vec<Pos>
 ) -> bool {
     if let Some(existing) = visited.get_mut(&reindeer) {
@@ -190,7 +190,7 @@ fn solve(input: &str) -> (isize, isize) {
     let points = 0;
     let path = vec![reindeer.pos];
     visited.insert(reindeer, (points, path.clone()));
-    
+
     check_moves(&map, reindeer, points, &mut visited, path);
 
     let ans_a = visited
@@ -207,7 +207,7 @@ fn solve(input: &str) -> (isize, isize) {
     }).into_iter().flatten().collect();
     _print_map(&map, &ans_b);
     let ans_b = ans_b.len().try_into().unwrap();
-    
+
     (ans_a, ans_b)
 }
 
